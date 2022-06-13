@@ -67,4 +67,4 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - run: nix-build --version
-      - run: nix-shell shell.nix --arg compiler-nix-name ${{matrix.ghc}}
+      - run: nix-build shell.nix --arg compiler-nix-name ${{matrix.ghc}}
