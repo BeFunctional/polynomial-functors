@@ -10,7 +10,7 @@ in hsPkgs.shellFor {
   tools = {
     cabal = "3.2.0.0";
     haskell-language-server = "latest";
-    nix-fmt = "latest";
+    nixfmt = "latest";
   };
 
   # Prevents cabal from choosing alternate plans, so that
