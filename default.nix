@@ -8,7 +8,7 @@ haskellNix ? (import (import ./nix/sources.nix)."haskellNix" { })
 
   # haskell.nix provides some arguments to be passed to nixpkgs, including some
   # patches and also the haskell.nix functionality itself as an overlay.
-, nixpkgsArgs ? haskellNix.nixpkgsArgs, compiler-nix-name ? "ghc8107" }:
+, nixpkgsArgs ? haskellNix.nixpkgsArgs, compiler-nix-name ? "ghc865" }:
 let pkgs = import nixpkgsSrc nixpkgsArgs;
 in pkgs.haskell-nix.project {
   inherit compiler-nix-name;
