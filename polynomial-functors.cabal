@@ -20,6 +20,10 @@ library
                       dependent-map,
                       dependent-sum,
                       dependent-sum-template,
+                      QuickCheck,
+                      hedgehog-quickcheck,
+                      hedgehog,
+                      hedgehog-classes,
                       finite,
                       universe
 
@@ -32,3 +36,7 @@ test-suite polynomial-functors-test
     hs-source-dirs:   test
     main-is:          MyLibTest.hs
     build-depends:    base ^>=4.12
+                        , hedgehog
+                        , tasty
+                        ,tasty-hedgehog
+                        ,QuickCheck
