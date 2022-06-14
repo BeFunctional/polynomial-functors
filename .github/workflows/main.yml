@@ -43,7 +43,7 @@ jobs:
             package much-obliged
                 ghc-options: -Werror
             EOF
-          nix-build -A hsPkgs.polynomial-functors.components.lib --arg compiler-nix-name ${{matrix.ghc}}
+          nix-build -A hsPkgs.polynomial-functors.components.lib --arg compiler-nix-name "${{matrix.ghc}}"
 
   build-shell:
     strategy:
@@ -67,4 +67,4 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - run: nix-build --version
-      - run: nix-build shell.nix --arg compiler-nix-name ${{matrix.ghc}}
+      - run: nix-build shell.nix --arg compiler-nix-name "${{matrix.ghc}}"
