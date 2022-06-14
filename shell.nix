@@ -9,6 +9,7 @@ in hsPkgs.shellFor {
   # Some common tools can be added with the `tools` argument
   tools = {
     cabal = "3.2.0.0";
+    cabal-fmt = "latest";
     haskell-language-server = "latest";
     nixfmt = "latest";
   };

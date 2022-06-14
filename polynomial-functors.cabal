@@ -2,41 +2,37 @@ cabal-version:      3.0
 name:               polynomial-functors
 version:            0.1.0.0
 synopsis:
-
-
-
-license:            NONE
+license:
 author:             o1lo01ol1o
 maintainer:         repos@befunctional.io
-
-
 category:           Data
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules:  Data.Functor.Poly
+  exposed-modules:  Data.Functor.Poly
+  build-depends:
+    , base                    ^>=4.12
+    , dependent-map
+    , dependent-sum
+    , dependent-sum-template
+    , finite
+    , hedgehog
+    , hedgehog-classes
+    , hedgehog-quickcheck
+    , QuickCheck
+    , universe
 
-    build-depends:    base ^>=4.12,
-                      dependent-map,
-                      dependent-sum,
-                      dependent-sum-template,
-                      QuickCheck,
-                      hedgehog-quickcheck,
-                      hedgehog,
-                      hedgehog-classes,
-                      finite,
-                      universe
-
-    hs-source-dirs:   src
-    default-language: Haskell2010
+  hs-source-dirs:   src
+  default-language: Haskell2010
 
 test-suite polynomial-functors-test
-    default-language: Haskell2010
-    type:             exitcode-stdio-1.0
-    hs-source-dirs:   test
-    main-is:          MyLibTest.hs
-    build-depends:    base ^>=4.12
-                        , hedgehog
-                        , tasty
-                        ,tasty-hedgehog
-                        ,QuickCheck
+  default-language: Haskell2010
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test
+  main-is:          MyLibTest.hs
+  build-depends:
+    , base            ^>=4.12
+    , hedgehog
+    , QuickCheck
+    , tasty
+    , tasty-hedgehog
