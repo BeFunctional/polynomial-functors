@@ -33,3 +33,8 @@ parallel :: forall (c1 :: Container) (c2 :: Container) (c3 :: Container) (c4 :: 
 parallel (Lens fw1 bw1) (Lens fw2 bw2) = Lens
   (bimap fw1 fw2)
   (\(a, b) -> bimap (bw1 a) (bw2 b))
+
+type UnitContainer = '((),())
+
+functionAsDynamics :: (a -> b) -> Morphism '(a, b) UnitContainer
+functionAsDynamics fn = Lens (const ()) (\x -> const (fn x))
