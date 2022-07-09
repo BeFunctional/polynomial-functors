@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE PolyKinds #-}
 -- {-# LANGUAGE StandaloneKindSignatures #-} GHC 8.10 only
 
 module Data.Functor.Poly where
@@ -9,11 +10,29 @@ module Data.Functor.Poly where
 import Data.Bifunctor
 import Data.Kind
 
-type Container = (Type, Type)
+data TyCon :: (k1 -> k2) -> (TyFun k1 k2) -> *
+data TyFun :: * -> * -> *
+--type family Apply (f :: *) (a :: k1) :: k2
+type family Apply (f :: (TyFun k1 k2) -> *) (x :: k1) :: k2
+type instance Apply (TyCon tc) x = tc x
+
+data Container :: Type where
+  Cont :: (x :: Type) -> (x -> Type) -> Container
+
+type family Const (x :: Type) (y :: Type) :: Type where
+  Const x y = x
+
+
+type family Const2 (x :: Type) :: Type -> Type where
+  Const2 x = Apply Const x
+
+{-
+type family DepSum (f :: x -> Type) (g :: y -> Type) :: (x, y) -> Type where
+  DepSum f g =
 
 -- type Prod :: Container -> Container -> Container
 type family Prod (c1 :: Container) (c2 :: Container) :: Container where
-  Prod '(a, b) '(x, y) = '((a, x), (b, y))
+  Prod (Cont a b) (Cont x y) = Cont (a, x) (DepSum b y)
 
 -- type Sum :: Container -> Container -> Container
 type family Sum (c1 :: Container) (c2 :: Container) :: Container where
@@ -36,5 +55,7 @@ parallel (Lens fw1 bw1) (Lens fw2 bw2) = Lens
 
 type UnitContainer = '((),())
 
+-- ^ Functions are trivial dynamical systems
 functionAsDynamics :: (a -> b) -> Morphism '(a, b) UnitContainer
 functionAsDynamics fn = Lens (const ()) (\x -> const (fn x))
+-}

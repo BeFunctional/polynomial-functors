@@ -15,3 +15,4 @@ class Moore state output input | state -> input , state -> output where
 mooreAsLens :: Moore st out inp => Morphism '(st, st) '(out, inp)
 mooreAsLens = Lens extract update
 
+-- use them as processes
