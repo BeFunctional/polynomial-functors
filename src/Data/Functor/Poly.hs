@@ -9,53 +9,32 @@ module Data.Functor.Poly where
 
 import Data.Bifunctor
 import Data.Kind
-
-data TyCon :: (k1 -> k2) -> (TyFun k1 k2) -> *
-data TyFun :: * -> * -> *
---type family Apply (f :: *) (a :: k1) :: k2
-type family Apply (f :: (TyFun k1 k2) -> *) (x :: k1) :: k2
-type instance Apply (TyCon tc) x = tc x
+import Data.Boundary
+import Data.Functor.Const
 
 data Container :: Type where
   Cont :: (x :: Type) -> (x -> Type) -> Container
 
-type family Const (x :: Type) (y :: Type) :: Type where
-  Const x y = x
+testCont :: Container
+testCont = undefined -- how do I build a value of Container????
 
+type family Shape (c :: Container) :: Type where
+  Shape (Cont x _) = x
 
-type family Const2 (x :: Type) :: Type -> Type where
-  Const2 x = Apply Const x
+type family Positions (c :: Container) (v :: Shape c) :: Type where
+  -- Shape (Cont s p) v = p v -- How do I do this???
 
-{-
-type family DepSum (f :: x -> Type) (g :: y -> Type) :: (x, y) -> Type where
-  DepSum f g =
+type family FromBoundary (x :: Type) (y :: Type) :: Container where
+  FromBoundary a b = Cont a (Const b)
 
--- type Prod :: Container -> Container -> Container
-type family Prod (c1 :: Container) (c2 :: Container) :: Container where
-  Prod (Cont a b) (Cont x y) = Cont (a, x) (DepSum b y)
+data family Choice :: (x, y) -> Type
 
--- type Sum :: Container -> Container -> Container
-type family Sum (c1 :: Container) (c2 :: Container) :: Container where
-  Sum '(a, b) '(x, y) = '(Either a x, Either b y)
+type family DepSum (x :: Type) (y :: Type) (f :: x -> Type) (g :: y -> Type) :: (x, y) -> Type where
+  DepSum x y f g = Choice
 
--- x       y
---     ->
--- s       r
--- | Morphism of containers
-data Morphism :: Container -> Container -> Type where
-  Lens :: forall (x :: Type) (s :: Type) (y :: Type) (r :: Type).
-          (x -> y) -> (x -> r -> s) -> Morphism '(x, s) '(y, r)
-
--- | Parallel composition of lenses
-parallel :: forall (c1 :: Container) (c2 :: Container) (c3 :: Container) (c4 :: Container).
-            Morphism c1 c2 -> Morphism c3 c4 -> Morphism (Prod c1 c3) (Prod c2 c4)
-parallel (Lens fw1 bw1) (Lens fw2 bw2) = Lens
-  (bimap fw1 fw2)
-  (\(a, b) -> bimap (bw1 a) (bw2 b))
-
-type UnitContainer = '((),())
-
--- ^ Functions are trivial dynamical systems
-functionAsDynamics :: (a -> b) -> Morphism '(a, b) UnitContainer
-functionAsDynamics fn = Lens (const ()) (\x -> const (fn x))
--}
+data CMorphism :: Container -> Container -> Type where
+  MkDLens :: -- (fw :: (Shape c1 -> Shape c2)) -- this name doesn't work
+             ((Shape c1 -> Shape c2)) -- But this works
+          -- -> ((x :: Shape c1) -> Positions c2 (fw x) -> Positions c1 x
+          -- This has no chance of working because `Positions` does not work
+          -> CMorphism c1 c2
