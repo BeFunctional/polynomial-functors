@@ -138,7 +138,7 @@ Containers are types.
 If you have a type and a dependent type that depends on the firs type you can make a container.
 
 ```
-Γ ⊢ c : Container
+Γ ⊢ c : Container     Γ ⊢ B : Container -> Type
 
 Δ, (x : Type), (y : x -> Type) ⊢ b(MkCont x y) : B(c)
 --------------------------------------------
@@ -153,6 +153,14 @@ in particular there are three operations that allow us to compose state machines
 here they are:
 
 #### Product
+
+let prod = (\x y ->
+  polyElim (\_ => Poly) (\s1 p1 ->
+  polyElim (\_ => Poly) (\s2 p2 ->
+    MkPoly (Prod s1 s2)
+           (elimSigma (\_ _ -> *)
+                      (\a b -> Sum (p1 a) (p2 b)))
+    y) x) :: Poly -> Poly -> Poly
 
 ```
 Γ ⊢ c1 : Container
@@ -189,4 +197,41 @@ assming we have `Bool` in our type theory.
     match c2 with λ s2 => λ p2 =>
       MkCont (c1, c2) (λx => match x with
         λ a => λ b => (p1(a), p2(b))
+```
+
+## A type theory around containers
+
+Containers can be implemented in a martin-lof type theory but could we possibly define a language based solely
+on containers? What would the rules of such language be?
+
+
+```
+Γ ⊢ x : Type
+Γ ⊢ y : Type
+-------------------- MkContainer
+Γ ⊢ m : Container
+
+Γ ⊢ m : Container
+Δ, a : x, y : Type ⊢ ty
+Δ, s : a, p : y ⊢ val
+------------------------- ElimCont
+Γ, Δ ⊢ (case m of
+  MkCont s p -> val) : ty
+
+Γ ⊢ m1 : Container
+Γ ⊢ m2 : Container
+----------------------- coproduct
+Γ ⊢ m1 + m2 : Container
+
+-- I have no idea what I'm doing
+Γ ⊢ m1 : Container
+Γ ⊢ m2 : Container
+Δ, a1 : x1, y1 : Type ⊢ ty1
+Δ, a2 : x2, y2 : Type ⊢ ty2
+Δ, s1 : a1, p2 : y1 ⊢ val1
+Δ, s1 : a2, p2 : y2 ⊢ val2
+----------------------------- ElimCont+
+Γ, Δ ⊢ (case m1 + m2 of
+  MkCont s1 p2 -> val1
+  MkCont s1 p2 -> val2) : ty
 ```
