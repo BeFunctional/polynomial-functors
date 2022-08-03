@@ -104,16 +104,17 @@ how it differs in the next rule:
 ```
 Γ ⊢ v : X    Γ ⊢ a : A(v)
 
-Γ ⊢ Σ(x : X, A(x)) : Type
+Γ ⊢ Σ[x : X] A(x) : Type
 --------------------------
-Γ ⊢ (v, a) : Σ(x : X, A(x))
+Γ ⊢ (v, a) : Σ[x : X] A(x)
 ```
 
 This premisse has three judgement, the first two say that we need both a value `v` of type `X` and a value `a` of type
 `A(v)`. Finally we also need a Sigma type using the same types as
 
 ```
-Γ ⊢ s : Σ(x : X, A(x))
+Γ, (X : Type), (A : X -> Type) ⊢ s : Σ(x : X, A(x))
+Γ, (X : Type), (y : (_ : X) -> Type) ⊢ B((x, y)) : Type
 
 Δ, (x : X), (y : A(x)) ⊢ b(x, y) : B((x, y))
 ----------------------------------------
