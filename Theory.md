@@ -236,3 +236,51 @@ on containers? What would the rules of such language be?
   MkCont s1 p2 -> val1
   MkCont s1 p2 -> val2) : ty
 ```
+
+## A graphical user interface
+
+Polynomial functors are useful to describe state machine and their _interfaces_ in this project we are solely interested
+in representing the interface. This provides us with the ability to tell which state machines are compatible with
+each other, how to extend existing state machines and what are the tools available to contruct new machines out of
+existing ones.
+
+### Compose state machines
+
+We've seen 3 operators on state machines: +, * and × each of them has a different meaning when composing state
+machine interfaces.
+
+#### Product *
+
+Given state machines `m1` and `m2` we can create state machine `m1 * m2` which will be a machine that expects
+an input designed for either `m1` or `m2`. If the `m1`input is given, the first machine will run, if the `m2`
+input is given, the second machine will be run. Regardless of which machine runs on input, the combined machine
+will return the output of both machines.
+
+#### Coproduct +
+
+Much like `*`, combining two machines with `+` will give the choice of running either the first or second machine.
+The difference is that the combined machine will only return the result of the machine that corresponds to the input
+you've given it. So if you give an input for `m1` you get the output of `m1` without the current state of `m2`.
+
+#### Tensor ×
+
+This operators runs two machines in parallel, as such you need to provide inputs for both machines are the same time
+and the output will be the output of both machines.
+
+### Fibonacci graphically
+
+
+Using the previous combinators we can build a machine that generate the fibonacci sequence, compositionally.
+
+First we need a machine that performs a `+n` operation where `n` is the previously computed value, such machine has a `Nat` input and a `Nat` output
+therefor we can represent it as a polynomial functor `Nat X^Nat`
+
+We run both those machines in parallel, resulting in the container `Nat*Nat X^{Nat*Nat}` this is because one
+machine will update the last value of the state independently.
+
+In order to extract the fibonacci value out of the pair of numbers we need to map it to a single number.
+`Nat * Nat` returns the pair of the last two fibonacci number so to get the next one we need to add them together
+this is done by sequencing our machine with a `Nat * Nat X^Nat` polynomial.
+
+
+
