@@ -94,7 +94,7 @@ when applied to the value `v`.
 
 ```
 Γ, x : X ⊢ A(x) : Type
-----------------------
+------------------------- Σ-ty
 Γ ⊢ Σ(x : X, A(x)) : Type
 ```
 
@@ -105,7 +105,7 @@ how it differs in the next rule:
 Γ ⊢ v : X    Γ ⊢ a : A(v)
 
 Γ ⊢ Σ[x : X] A(x) : Type
---------------------------
+-------------------------- Σ-Con
 Γ ⊢ (v, a) : Σ[x : X] A(x)
 ```
 
@@ -117,7 +117,7 @@ This premisse has three judgement, the first two say that we need both a value `
 Γ, (X : Type), (y : (_ : X) -> Type) ⊢ B((x, y)) : Type
 
 Δ, (x : X), (y : A(x)) ⊢ b(x, y) : B((x, y))
-----------------------------------------
+-----------------------------------------------------------------  Σ-elim
 Γ, Δ ⊢ match s with (λ (x : X) => λ (y : A(x)) => b(x, y)) : B(s)
 ```
 

@@ -52,22 +52,18 @@ iType_ ii g (Sigma_ f s)      = do
   let fVal = cEval_ f (fst g, [])
   cType_ ii g s (VPi_ fVal (const VStar_))
   return VStar_
-iType_ ii g (SigElim_ m f p) = do
-  sig <- iType_ ii g p
-  case sig of
-    VSigma_ f s ->
-
-     -- check m has this type:
-     -- m : (ty : Type) -> (fy : ty -> Type) -> Sigma ty fy -> Type
-     cType_ ii g m (VPi_ VStar_ $ \ty ->
-                    VPi_ (VPi_ ty (const VStar_)) (\fy ->
-                    VPi_ (VSigma_ ty fy) (const VStar_)))
-     let mVal = cEval_ m (fst g, [])
-     cType_ ii g m (VPi_ VStar_ $ \ty ->
-                    VPi_ (VPi_ ty (const VStar_)) (\fy ->
-                    VPi_ (VSigma_ ty fy) (const VStar_)))
-     let pVal = cEval_ p (fst g, [])
-     return mVal `vapp_` pVal
+iType_ ii g (SigElim_ ty fty m f p) = do
+  cType_ ii g ty VStar_
+  let tyVal = cEval_ ty (fst g, [])
+  sig <- cType_ ii g fty (VPi_ tyVal (const VStar_))
+  let fyVal = cEval_ fty (fst g, [])
+  -- m : Sigma ty fy -> Type
+  cType_ ii g m (VPi_ (VSigma_ tyVal fyVal) (const VStar_))
+  let mVal = cEval_ m (fst g, [])
+  cType_ ii g f (VPi_ (VSigma_ tyVal fyVal) (\sig -> mVal `vapp_` sig))
+  cType_ ii g p (VSigma_ tyVal fyVal)
+  let product = cEval_ p (fst g, [])
+  return $ mVal `vapp_` product
 
 iType_ ii g Poly_             = return VPoly_
 iType_ ii g (PolyElim_ m f c) =
@@ -148,12 +144,25 @@ iType_ _ _ tm = throwError $ "No type match for " ++ render (iPrint_ 0 0 tm)
 cType_ :: Int -> (NameEnv Value_,Context_) -> CTerm_ -> Type_ -> Result ()
 cType_ ii g (Inf_ e) v
   =     do  v' <- iType_ ii g e
-            unless ( quote0_ v == quote0_ v') (throwError ("type mismatch:\n" ++ "type inferred:  " ++ render (cPrint_ 0 0 (quote0_ v')) ++ "\n" ++ "type expected:  " ++ render (cPrint_ 0 0 (quote0_ v)) ++ "\n" ++ "for expression: " ++ render (iPrint_ 0 0 e)))
+            unless ( quote0_ v == quote0_ v')
+                   (throwError ("type mismatch:\n"
+                             ++ "type inferred:  "
+                             ++ render (cPrint_ 0 0 (quote0_ v')) ++ "\n"
+                             ++ "type expected:  " ++ render (cPrint_ 0 0 (quote0_ v)) ++ "\n"
+                             ++ "for expression: " ++ render (iPrint_ 0 0 e)))
 cType_ ii g (Lam_ e) ( VPi_ ty ty')
   =     cType_  (ii + 1) ((\ (d,g) -> (d,  ((Local ii, ty ) : g))) g)
                 (cSubst_ 0 (Free_ (Local ii)) e) ( ty' (vfree_ (Local ii)))
 cType_ ii g Zero_      VNat_  =  return ()
 cType_ ii g (Succ_ k)  VNat_  =  cType_ ii g k VNat_
+cType_ ii g (Comma_ x f) (VSigma_ ty' fy') = do
+  let xVal = cEval_ x (fst g, [])
+  unless (quote0_ xVal == quote0_ ty')
+         (throwError $ "type mismatch:\n"
+                    ++ "given: " ++ render (cPrint_ 0 0 (quote0_ xVal)) ++ "\n"
+                    ++ "expected: " ++ render (cPrint_ 0 0 (quote0_ ty')) ++ "\n")
+
+
 cType_ ii g (MkPoly_ x f) VPoly_ =
   do cType_ ii g x VStar_ -- check if the first argument is a type
      let xVal = cEval_ x (fst g, [])
@@ -196,8 +205,9 @@ cType_ ii g@(v,t) (FSucc_ n f') (VFin_ (VSucc_ mVal)) =
     unless  (quote0_ nVal == quote0_ mVal)
             (throwError "number mismatch FSucc")
     cType_ ii g f' (VFin_ mVal)
-cType_ ii g _ _
-  =     throwError "type mismatch"
+cType_ ii g a b
+  = throwError $ "type mismatch - unimplemented \n" ++
+                 "given: " ++ render (cPrint_ 0 0 (quote0_ (cEval_ a (fst g, []))))
 
 iSubst_ :: Int -> ITerm_ -> ITerm_ -> ITerm_
 iSubst_ ii i'   (Ann_ c c')     =  Ann_ (cSubst_ ii i' c) (cSubst_ ii i' c')

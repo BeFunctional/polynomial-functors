@@ -33,7 +33,7 @@ data ITerm_
    |  Poly_ -- type poly
    |  PolyElim_ CTerm_ CTerm_ CTerm_ -- Eliminator for Poly
    |  Sigma_ CTerm_ CTerm_ -- Type of Σ
-   |  SigElim_ CTerm_ CTerm_ CTerm_ CTerm_ -- Eliminator for Sigma
+   |  SigElim_ CTerm_ CTerm_ CTerm_ CTerm_ CTerm_ -- Eliminator for Sigma
   deriving (Show, Eq)
 
 data Value_

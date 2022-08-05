@@ -27,6 +27,7 @@ iPrint_ p ii (Fin_ n)          =  iPrint_ p ii (Free_ (Global "Fin") :$: n)
 iPrint_ p ii (FinElim_ m mz ms n f)
                                =  iPrint_ p ii (Free_ (Global "finElim") :$: m :$: mz :$: ms :$: n :$: f)
 iPrint_ p ii x                 =  text ("[" ++ show x ++ "]")
+
 cPrint_ :: Int -> Int -> CTerm_ -> Doc
 cPrint_ p ii (Inf_ i)    = iPrint_ p ii i
 cPrint_ p ii (Lam_ c)    = parensIf (p > 0) (text "\\ " <> text (vars !! ii) <> text " -> " <> cPrint_ 0 (ii + 1) c)
@@ -38,6 +39,7 @@ cPrint_ p ii (Cons_ a n x xs) =
 cPrint_ p ii (Refl_ a x) = iPrint_ p ii (Free_ (Global "Refl") :$: a :$: x)
 cPrint_ p ii (FZero_ n)  = iPrint_ p ii (Free_ (Global "FZero") :$: n)
 cPrint_ p ii (FSucc_ n f)= iPrint_ p ii (Free_ (Global "FSucc") :$: n :$: f)
+cPrint_ p ii (Comma_ x y) = lparen <> cPrint_ p ii x <> comma <> cPrint_ p ii y <> rparen
 fromNat_ :: Int -> Int -> CTerm_ -> Doc
 fromNat_ n ii Zero_ = int n
 fromNat_ n ii (Succ_ k) = fromNat_ (n + 1) ii k

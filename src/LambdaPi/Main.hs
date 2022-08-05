@@ -14,6 +14,12 @@ lpte :: Ctx Value_
 lpte =      [(Global "Zero", VNat_),
              (Global "Succ", VPi_ VNat_ (\ _ -> VNat_)),
              (Global "Nat", VStar_),
+             (Global "Type", VStar_),
+             -- natElim : (m : Nat -> Type) ->
+             --           (m Z) ->
+             --           ((k : Nat) -> m k -> m (S k)) ->
+             --           (n : Nat) ->
+             --           m n
              (Global "natElim", VPi_ (VPi_ VNat_ (\ _ -> VStar_)) (\ m ->
                                VPi_ (m `vapp_` VZero_) (\ _ ->
                                VPi_ (VPi_ VNat_ (\ k -> VPi_ (m `vapp_` k) (\ _ -> (m `vapp_` (VSucc_ k))))) ( \ _ ->
@@ -25,6 +31,21 @@ lpte =      [(Global "Zero", VNat_),
                                        motive `vapp_` VMkPoly_ sh pos))) (\_ ->    -- eliminator
                                  VPi_ VPoly_ (\c ->                            -- argument
                                  motive `vapp_` c)))),                          -- return type
+             (Global "Sigma", VPi_ VStar_ (\x -> VPi_ (VPi_ x (const VStar_)) (const VStar_))),
+             (Global "MkSigma", VPi_ VStar_ (\x -> VPi_
+                                     (VPi_ x (const VStar_)) (\f -> VPi_
+                                     x (\p1 -> VPi_
+                                     (f `vapp_` p1) (\p2 ->
+                                     VComma_ x f))))),
+             -- sigElim : (ty : Type) ->
+             --           (fy : ty -> Type) ->
+             --           (m : Sigma ty fy -> Type)
+             --           (s : Sigma ty fy)
+             --           m s
+             (Global "sigElim", VPi_ VStar_ (\ty -> VPi_
+                                     (VPi_ ty (const VStar_)) (\fy -> VPi_
+                                     (VPi_ (VSigma_ ty fy) (const VStar_)) (\m -> VPi_
+                                     (VSigma_ ty fy) (\s -> m `vapp_` s))))),
              (Global "Nil", VPi_ VStar_ (\ a -> VVec_ a VZero_)),
              (Global "Cons", VPi_ VStar_ (\ a ->
                             VPi_ VNat_ (\ n ->
@@ -65,6 +86,7 @@ lpve =      [(Global "Zero", VZero_),
              (Global "Nat", VNat_),
              (Global "natElim", cEval_ (Lam_ (Lam_ (Lam_ (Lam_ (Inf_ (NatElim_ (Inf_ (Bound_ 3)) (Inf_ (Bound_ 2)) (Inf_ (Bound_ 1)) (Inf_ (Bound_ 0)))))))) ([], [])),
              (Global "Poly", VPoly_),
+             (Global "Type", VStar_),
              (Global "Nil", VLam_ (\ a -> VNil_ a)),
              (Global "Cons", VLam_ (\ a -> VLam_ (\ n -> VLam_ (\ x -> VLam_ (\ xs ->
                             VCons_ a n x xs))))),
