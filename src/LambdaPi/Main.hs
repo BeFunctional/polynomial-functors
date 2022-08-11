@@ -37,15 +37,21 @@ lpte =      [(Global "Zero", VNat_),
                                      x (\p1 -> VPi_
                                      (f `vapp_` p1) (\p2 ->
                                      VComma_ x f))))),
+             -- z : Σ[x : A1] A2            x : A1, y : A2 ⊢ b : B(x, y)
+             -- --------------------------------------------------------
+             --     match z of (x, y) => b : B(z)
+
              -- sigElim : (ty : Type) ->
              --           (fy : ty -> Type) ->
-             --           (m : Sigma ty fy -> Type)
+             --           (m : (x : ty) -> fy x -> Type)
+             --           (i : (x : ty) -> (y : fy x) -> m x y)
              --           (s : Sigma ty fy)
              --           m s
              (Global "sigElim", VPi_ VStar_ (\ty -> VPi_
                                      (VPi_ ty (const VStar_)) (\fy -> VPi_
                                      (VPi_ (VSigma_ ty fy) (const VStar_)) (\m -> VPi_
-                                     (VSigma_ ty fy) (\s -> m `vapp_` s))))),
+                                     (VPi_ ty (\x -> VPi_ (fy `vapp_` x) (\y -> m `vapp_` VComma_ x y))) (\i -> VPi_
+                                     (VSigma_ ty fy) (\s -> m `vapp_` s)))))),
              (Global "Nil", VPi_ VStar_ (\ a -> VVec_ a VZero_)),
              (Global "Cons", VPi_ VStar_ (\ a ->
                             VPi_ VNat_ (\ n ->
