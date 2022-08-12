@@ -36,7 +36,7 @@ lpte =      [(Global "Zero", VNat_),
                                      (VPi_ x (const VStar_)) (\f -> VPi_
                                      x (\p1 -> VPi_
                                      (f `vapp_` p1) (\p2 ->
-                                     VComma_ x f))))),
+                                     VSigma_ x f))))),
              -- z : Σ[x : A1] A2            x : A1, y : A2 ⊢ b : B(x, y)
              -- --------------------------------------------------------
              --     match z of (x, y) => b : B(z)

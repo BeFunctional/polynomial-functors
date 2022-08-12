@@ -205,9 +205,10 @@ cType_ ii g@(v,t) (FSucc_ n f') (VFin_ (VSucc_ mVal)) =
     unless  (quote0_ nVal == quote0_ mVal)
             (throwError "number mismatch FSucc")
     cType_ ii g f' (VFin_ mVal)
-cType_ ii g a b
-  = throwError $ "type mismatch - unimplemented \n" ++
+cType_ ii g a v
+  = throwError $ "type mismatch - (unimplemented?) \n" ++
                  "given: " ++ render (cPrint_ 0 0 (quote0_ (cEval_ a (fst g, []))))
+             ++ " type expected: " ++ render (cPrint_ 0 0 (quote0_ v)) ++ "\n"
 
 iSubst_ :: Int -> ITerm_ -> ITerm_ -> ITerm_
 iSubst_ ii i'   (Ann_ c c')     =  Ann_ (cSubst_ ii i' c) (cSubst_ ii i' c')

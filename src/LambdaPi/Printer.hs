@@ -26,6 +26,9 @@ iPrint_ p ii (EqElim_ a m mr x y eq)
 iPrint_ p ii (Fin_ n)          =  iPrint_ p ii (Free_ (Global "Fin") :$: n)
 iPrint_ p ii (FinElim_ m mz ms n f)
                                =  iPrint_ p ii (Free_ (Global "finElim") :$: m :$: mz :$: ms :$: n :$: f)
+iPrint_ p ii (Sigma_ x y)      =  iPrint_ p ii (Free_ (Global "Sigma") :$: x :$: y)
+iPrint_ p ii (SigElim_ c y m f v)
+                               =  iPrint_ p ii (Free_ (Global "SigElim") :$: c :$: y :$: m :$: f :$: v)
 iPrint_ p ii x                 =  text ("[" ++ show x ++ "]")
 
 cPrint_ :: Int -> Int -> CTerm_ -> Doc
@@ -39,7 +42,8 @@ cPrint_ p ii (Cons_ a n x xs) =
 cPrint_ p ii (Refl_ a x) = iPrint_ p ii (Free_ (Global "Refl") :$: a :$: x)
 cPrint_ p ii (FZero_ n)  = iPrint_ p ii (Free_ (Global "FZero") :$: n)
 cPrint_ p ii (FSucc_ n f)= iPrint_ p ii (Free_ (Global "FSucc") :$: n :$: f)
-cPrint_ p ii (Comma_ x y) = lparen <> cPrint_ p ii x <> comma <> cPrint_ p ii y <> rparen
+cPrint_ p ii (MkPoly_ x y) = iPrint_ p ii (Free_ (Global "MkPoly") :$: x :$: y)
+cPrint_ p ii (Comma_ x y) = iPrint_ p ii (Free_ (Global "MkSigma") :$: x :$: y)
 fromNat_ :: Int -> Int -> CTerm_ -> Doc
 fromNat_ n ii Zero_ = int n
 fromNat_ n ii (Succ_ k) = fromNat_ (n + 1) ii k
