@@ -15,6 +15,7 @@ data CTerm_
    |  MkPoly_ CTerm_ CTerm_ -- constructor poly
    |  Comma_ CTerm_ CTerm_ -- constructor for Sigma
   deriving (Show, Eq)
+
 data ITerm_
    =  Ann_ CTerm_ CTerm_
    |  Star_

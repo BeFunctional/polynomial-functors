@@ -86,6 +86,8 @@ lpte =      [(Global "Zero", VNat_),
                                VPi_ VNat_ (\ n -> VPi_ (VFin_ n) (\ f ->
                                m `vapp_` n `vapp_` f))))))]
 
+data FullContext = FullContext { types :: Ctx Value_, values :: Ctx Value_ }
+
 lpve :: Ctx Value_
 lpve =      [(Global "Zero", VZero_),
              (Global "Succ", VLam_ (\ n -> VSucc_ n)),
@@ -105,6 +107,9 @@ lpve =      [(Global "Zero", VZero_),
              (Global "FSucc", VLam_ (\ n -> VLam_ (\ f -> VFSucc_ n f))),
              (Global "Fin", VLam_ (\ n -> VFin_ n)),
              (Global "finElim", cEval_ (Lam_ (Lam_ (Lam_ (Lam_ (Lam_ (Inf_ (FinElim_ (Inf_ (Bound_ 4)) (Inf_ (Bound_ 3)) (Inf_ (Bound_ 2)) (Inf_ (Bound_ 1)) (Inf_ (Bound_ 0))))))))) ([],[]))]
+
+bigContext :: [(key, v1)] -> [(key, v2)] -> [(key, (v1, v2))]
+bigContext c1 c2 = undefined
 
 lpassume state@(out, ve, te) x t =
   -- x: String, t: CTerm

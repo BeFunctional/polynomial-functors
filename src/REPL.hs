@@ -72,6 +72,7 @@ parseIO f p x = case P.parse (whiteSpace dummy >> p >>= \ x -> eof >> return x) 
                   Left e  -> putStrLn (show e) >> return Nothing
                   Right r -> return (Just r)
 
+
 readevalprint :: Interpreter i c v t tinf inf -> State v inf -> IO ()
 readevalprint int state@(out, ve, te) =
   let rec int state =

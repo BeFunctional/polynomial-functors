@@ -7,12 +7,12 @@ data Name
    =  Global  String
    |  Local   Int
    |  Quote   Int
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Type
    =  TFree  Name
    |  Fun    Type Type
-  deriving (Show, Eq) 
+  deriving (Show, Eq)
 
 type Result a = Either String a
 type NameEnv v = [(Name, v)]

@@ -14,6 +14,7 @@ cEval_ (Cons_ a n x xs)  d  =  VCons_  (cEval_ a d) (cEval_ n d)
 cEval_ (Refl_ a x)       d  =  VRefl_ (cEval_ a d) (cEval_ x d)
 cEval_ (FZero_ n)    d  =  VFZero_ (cEval_ n d)
 cEval_ (FSucc_ n f)  d  =  VFSucc_ (cEval_ n d) (cEval_ f d)
+cEval_ (MkPoly_ s p) d  =  VMkPoly_ (cEval_ s d) (cEval_ p d)
 
 iEval_ :: ITerm_ -> (NameEnv Value_,Env_) -> Value_
 iEval_ (Ann_  c _)     d  =  cEval_ c d
