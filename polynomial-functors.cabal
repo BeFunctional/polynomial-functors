@@ -9,32 +9,33 @@ category:           Data
 extra-source-files: CHANGELOG.md
 
 library
-  exposed-modules:  Data.Functor.Poly
-                    Data.Boundary
+  exposed-modules:
+        Common
+        REPL
+        LambdaPi.AST
+        LambdaPi.Check
+        LambdaPi.Eval
+        LambdaPi.Parser
+        LambdaPi.Printer
+        LambdaPi.Quote
   build-depends:
-    , base                    ^>=4.12
-    , dependent-map
-    , dependent-sum
-    , dependent-sum-template
-    , finite
-    , hedgehog
-    , hedgehog-classes
-    , hedgehog-quickcheck
-    , QuickCheck
-    , universe
+      base >=4.9.1.0
+    , mtl >=2.2.1
+    , parsec >=3.1.11
+    , pretty >=1.1.3.5
 
   hs-source-dirs:   src
   default-language: Haskell2010
 
 executable lp
-    build-depends:
-        base >=4.9.1.0,
-        mtl >=2.2.1,
-        parsec >=3.1.11,
-        pretty >=1.1.3.5
     main-is: LambdaPi/Main.hs
     buildable: True
     hs-source-dirs: src
+    build-depends:
+        base >=4.9.1.0
+      , mtl >=2.2.1
+      , parsec >=3.1.11
+      , pretty >=1.1.3.5
     other-modules:
         Common
         REPL
@@ -48,14 +49,14 @@ executable lp
     default-language: Haskell2010
 
 
-test-suite polynomial-functors-test
-  default-language: Haskell2010
-  type:             exitcode-stdio-1.0
-  hs-source-dirs:   test
-  main-is:          MyLibTest.hs
-  build-depends:
-    , base            ^>=4.12
-    , hedgehog
-    , QuickCheck
-    , tasty
-    , tasty-hedgehog
+-- test-suite polynomial-functors-test
+--   default-language: Haskell2010
+--   type:             exitcode-stdio-1.0
+--   hs-source-dirs:   test
+--   main-is:          MyLibTest.hs
+--   build-depends:
+--     , base            ^>=4.12
+--     , hedgehog
+--     , QuickCheck
+--     , tasty
+--     , tasty-hedgehog
