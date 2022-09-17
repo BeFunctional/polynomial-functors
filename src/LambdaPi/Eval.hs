@@ -2,6 +2,7 @@ module LambdaPi.Eval where
 
 import Common
 import LambdaPi.AST
+import Debug.Trace
 
 cEval_ :: CTerm_ -> (NameEnv Value_,Env_) -> Value_
 cEval_ (Inf_  ii)    d  =  iEval_ ii d
@@ -79,3 +80,8 @@ iEval_ (FinElim_ m mz ms n f)  d  =
                                             (cEval_ ms d) (cEval_ n d) n')
            _                ->  error "internal: eval finElim"
   in   rec (cEval_ f d)
+iEval_ (SigElim_ ty sy motive f arg) d =
+  let fn = cEval_ f d in case (cEval_ arg d) of
+        VComma_ ty sy a b -> trace "found constructor" $ (fn `vapp_` a) `vapp_` b
+        VNeutral_ n       -> trace "found neutral term" $ VNeutral_ (NSigElim_ (cEval_ ty d) (cEval_ sy d) (cEval_ motive d) fn n)
+        _ -> error "internal: Eval container"

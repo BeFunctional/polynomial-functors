@@ -32,26 +32,28 @@ lpte =      [(Global "Zero", VNat_),
                                  VPi_ VPoly_ (\c ->                            -- argument
                                  motive `vapp_` c)))),                          -- return type
              (Global "Sigma", VPi_ VStar_ (\x -> VPi_ (VPi_ x (const VStar_)) (const VStar_))),
-             (Global "MkSigma", VPi_ VStar_ (\x -> VPi_
-                                     (VPi_ x (const VStar_)) (\f -> VPi_
-                                     x (\p1 -> VPi_
-                                     (f `vapp_` p1) (\p2 ->
-                                     VSigma_ x f))))),
+             (Global "MkSigma", VPi_ VStar_                      (\fstTy -> VPi_
+                                     (VPi_ fstTy (const VStar_)) (\sndTy -> VPi_
+                                     fstTy                       (\val1 -> VPi_
+                                     (sndTy `vapp_` val1)        (\val2 ->
+                                     VSigma_ fstTy sndTy))))),
              -- z : Σ[x : A1] A2            x : A1, y : A2 ⊢ b : B(x, y)
              -- --------------------------------------------------------
              --     match z of (x, y) => b : B(z)
 
              -- sigElim : (ty : Type) ->
              --           (fy : ty -> Type) ->
-             --           (m : (x : ty) -> fy x -> Type)
-             --           (i : (x : ty) -> (y : fy x) -> m x y)
+             --           (m : Sigma ty fy -> Type)
+             --           (i : (x : ty) -> (y : fy x) -> m (MkSigma x y))
              --           (s : Sigma ty fy)
              --           m s
              (Global "sigElim", VPi_ VStar_ (\ty -> VPi_
-                                     (VPi_ ty (const VStar_)) (\fy -> VPi_
-                                     (VPi_ (VSigma_ ty fy) (const VStar_)) (\m -> VPi_
-                                     (VPi_ ty (\x -> VPi_ (fy `vapp_` x) (\y -> m `vapp_` VComma_ x y))) (\i -> VPi_
-                                     (VSigma_ ty fy) (\s -> m `vapp_` s)))))),
+                               (VPi_ ty (const VStar_)) (\fy -> VPi_
+                               (VPi_ (VSigma_ ty fy) (const VStar_)) (\m -> VPi_
+                               (VPi_ ty (\x -> VPi_ (fy `vapp_` x) (\y ->
+                               m `vapp_` VComma_ ty fy x y))) (\i -> VPi_
+                               (VSigma_ ty fy) (\s ->
+                               m `vapp_` s)))))),
              (Global "Nil", VPi_ VStar_ (\ a -> VVec_ a VZero_)),
              (Global "Cons", VPi_ VStar_ (\ a ->
                             VPi_ VNat_ (\ n ->
@@ -95,6 +97,18 @@ lpve =      [(Global "Zero", VZero_),
              (Global "natElim", cEval_ (Lam_ (Lam_ (Lam_ (Lam_ (Inf_ (NatElim_ (Inf_ (Bound_ 3)) (Inf_ (Bound_ 2)) (Inf_ (Bound_ 1)) (Inf_ (Bound_ 0)))))))) ([], [])),
              (Global "Poly", VPoly_),
              (Global "Type", VStar_),
+             (Global "Sigma", VLam_ (\a -> VLam_ (\b -> VSigma_ a b))),
+             (Global "MkSigma", VLam_ (\a -> VLam_
+                                      (\b -> VLam_
+                                      (\v1 -> VLam_
+                                      (\v2 -> VComma_ a b v1 v2))))),
+             (Global "sigElim", cEval_ (Lam_ $ Lam_ $ Lam_ $ Lam_ $ Lam_ $
+                 Inf_ (SigElim_ (Inf_ (Bound_ 4))
+                                (Inf_ (Bound_ 3))
+                                (Inf_ (Bound_ 2))
+                                (Inf_ (Bound_ 1))
+                                (Inf_ (Bound_ 0)))
+                 ) ([],[])),
              (Global "Nil", VLam_ (\ a -> VNil_ a)),
              (Global "Cons", VLam_ (\ a -> VLam_ (\ n -> VLam_ (\ x -> VLam_ (\ xs ->
                             VCons_ a n x xs))))),

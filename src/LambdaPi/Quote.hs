@@ -22,7 +22,8 @@ quote_ ii VNat_       =  Inf_ Nat_
 quote_ ii VZero_      =  Zero_
 quote_ ii (VSucc_ n)  =  Succ_ (quote_ ii n)
 quote_ ii (VSigma_ x f) =  Inf_ (Sigma_ (quote_ ii x) (quote_ ii f))
-quote_ ii (VComma_ x f) =  Comma_ (quote_ ii x) (quote_ ii f)
+quote_ ii (VComma_ ty sy x f) =  Comma_ (quote_ ii ty) (quote_ ii sy)
+                                        (quote_ ii x) (quote_ ii f)
 quote_ ii VPoly_      =  Inf_ Poly_
 quote_ ii (VMkPoly_ s p) =  MkPoly_ (quote_ ii s) (quote_ ii p)
 quote_ ii (VVec_ a n)         =  Inf_ (Vec_ (quote_ ii a) (quote_ ii n))
@@ -41,6 +42,10 @@ neutralQuote_ ii (NApp_ n v)
    =  neutralQuote_ ii n :$: quote_ ii v
 neutralQuote_ ii (NNatElim_ m z s n)
    =  NatElim_ (quote_ ii m) (quote_ ii z) (quote_ ii s) (Inf_ (neutralQuote_ ii n))
+neutralQuote_ ii (NSigElim_ sy ty motive f arg)
+   =  SigElim_ (quote_ ii sy) (quote_ ii ty)
+               (quote_ ii motive) (quote_ ii f)
+               (Inf_ (neutralQuote_ ii arg))
 neutralQuote_ ii (NVecElim_ a m mn mc n xs)
    =  VecElim_ (quote_ ii a) (quote_ ii m)
                (quote_ ii mn) (quote_ ii mc)

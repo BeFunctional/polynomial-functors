@@ -155,7 +155,7 @@ cType_ ii g (Lam_ e) ( VPi_ ty ty')
                 (cSubst_ 0 (Free_ (Local ii)) e) ( ty' (vfree_ (Local ii)))
 cType_ ii g Zero_      VNat_  =  return ()
 cType_ ii g (Succ_ k)  VNat_  =  cType_ ii g k VNat_
-cType_ ii g (Comma_ x f) (VSigma_ ty' fy') = do
+cType_ ii g (Comma_ ty sy x f) (VSigma_ ty' fy') = do
   let xVal = cEval_ x (fst g, [])
   unless (quote0_ xVal == quote0_ ty')
          (throwError $ "type mismatch:\n"

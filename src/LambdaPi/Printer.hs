@@ -43,7 +43,7 @@ cPrint_ p ii (Refl_ a x) = iPrint_ p ii (Free_ (Global "Refl") :$: a :$: x)
 cPrint_ p ii (FZero_ n)  = iPrint_ p ii (Free_ (Global "FZero") :$: n)
 cPrint_ p ii (FSucc_ n f)= iPrint_ p ii (Free_ (Global "FSucc") :$: n :$: f)
 cPrint_ p ii (MkPoly_ x y) = iPrint_ p ii (Free_ (Global "MkPoly") :$: x :$: y)
-cPrint_ p ii (Comma_ x y) = iPrint_ p ii (Free_ (Global "MkSigma") :$: x :$: y)
+cPrint_ p ii (Comma_ ty sy x y) = iPrint_ p ii (Free_ (Global "MkSigma") :$: ty :$: sy :$: x :$: y)
 fromNat_ :: Int -> Int -> CTerm_ -> Doc
 fromNat_ n ii Zero_ = int n
 fromNat_ n ii (Succ_ k) = fromNat_ (n + 1) ii k
