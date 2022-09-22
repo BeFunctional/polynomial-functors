@@ -24,13 +24,20 @@ lpte =      [(Global "Zero", VNat_),
                                VPi_ (m `vapp_` VZero_) (\ _ ->
                                VPi_ (VPi_ VNat_ (\ k -> VPi_ (m `vapp_` k) (\ _ -> (m `vapp_` (VSucc_ k))))) ( \ _ ->
                                VPi_ VNat_ (\ n -> m `vapp_` n))))),
+             ------------------------------------------------------
+             -- Polynomial things
+             ------------------------------------------------------
+             (Global "Poly", trace "getting the type poly" VStar_), -- Poly is a type
              (Global "MkPoly", VPi_ VStar_ (\s -> VPi_ (VPi_ s (const VStar_)) (const VPoly_))),
-             (Global "polyElim", VPi_ (VPi_ VPoly_ (const VStar_)) (\motive -> -- motive
-                                 VPi_ (VPi_ VStar_ (\sh ->
-                                       VPi_ (VPi_ sh (const VStar_)) (\pos ->
-                                       motive `vapp_` VMkPoly_ sh pos))) (\_ ->    -- eliminator
-                                 VPi_ VPoly_ (\c ->                            -- argument
+             (Global "polyElim", VPi_ (VPi_ VPoly_ (const VStar_)) (\motive ->  -- motive
+                                 VPi_ (VPi_ VStar_ (\sh ->                      -- \
+                                       VPi_ (VPi_ sh (const VStar_)) (\pos ->   --  -eliminator
+                                       motive `vapp_` VMkPoly_ sh pos))) (\_ -> -- /
+                                 VPi_ VPoly_ (\c ->                             -- argument
                                  motive `vapp_` c)))),                          -- return type
+             ------------------------------------------------------
+             -- Sigma types
+             ------------------------------------------------------
              (Global "Sigma", VPi_ VStar_ (\x -> VPi_ (VPi_ x (const VStar_)) (const VStar_))),
              (Global "MkSigma", VPi_ VStar_                      (\fstTy -> VPi_
                                      (VPi_ fstTy (const VStar_)) (\sndTy -> VPi_
@@ -48,12 +55,15 @@ lpte =      [(Global "Zero", VNat_),
              --           (s : Sigma ty fy)
              --           m s
              (Global "sigElim", VPi_ VStar_ (\ty -> VPi_
-                               (VPi_ ty (const VStar_)) (\fy -> VPi_
-                               (VPi_ (VSigma_ ty fy) (const VStar_)) (\m -> VPi_
-                               (VPi_ ty (\x -> VPi_ (fy `vapp_` x) (\y ->
-                               m `vapp_` VComma_ ty fy x y))) (\i -> VPi_
-                               (VSigma_ ty fy) (\s ->
-                               m `vapp_` s)))))),
+                                     (VPi_ ty (const VStar_)) (\fy -> VPi_
+                                     (VPi_ (VSigma_ ty fy) (const VStar_)) (\m -> VPi_
+                                     (VPi_ ty (\x -> VPi_ (fy `vapp_` x) (\y ->
+                                     m `vapp_` VComma_ ty fy x y))) (\i -> VPi_
+                                     (VSigma_ ty fy) (\s ->
+                                     m `vapp_` s)))))),
+             ------------------------------------------------------
+             -- List things
+             ------------------------------------------------------
              (Global "Nil", VPi_ VStar_ (\ a -> VVec_ a VZero_)),
              (Global "Cons", VPi_ VStar_ (\ a ->
                             VPi_ VNat_ (\ n ->
@@ -69,6 +79,9 @@ lpte =      [(Global "Zero", VNat_),
                                      m `vapp_` VSucc_ n `vapp_` VCons_ a n x xs))))) (\ _ ->
                                VPi_ VNat_ (\ n ->
                                VPi_ (VVec_ a n) (\ xs -> m `vapp_` n `vapp_` xs))))))),
+             ------------------------------------------------------
+             -- Equality
+             ------------------------------------------------------
              (Global "Refl", VPi_ VStar_ (\ a -> VPi_ a (\ x ->
                             VEq_ a x x))),
              (Global "Eq", VPi_ VStar_ (\ a -> VPi_ a (\ x -> VPi_ a (\ y -> VStar_)))),
@@ -78,15 +91,29 @@ lpte =      [(Global "Zero", VNat_),
                               VPi_ a (\ x -> VPi_ a (\ y ->
                               VPi_ (VEq_ a x y) (\ eq ->
                               ((m `vapp_` x) `vapp_` y) `vapp_` eq))))))),
+             ------------------------------------------------------
+             -- Bool things
+             ------------------------------------------------------
+             (Global "Bool", VStar_),
+             (Global "True", VBool),
+             (Global "False", VBool),
+             (Global "if", (VPi_ (VPi_ VBool (const VStar_)) (\m -> VPi_
+                                 (m `vapp_` VTrue) (\th -> VPi_
+                                 (m `vapp_` VFalse) (\el -> VPi_
+                                 VBool (\b ->
+                                 m `vapp_` b)))))),
+             ------------------------------------------------------
+             -- Finite things
+             ------------------------------------------------------
              (Global "FZero", VPi_ VNat_ (\ n -> VFin_ (VSucc_ n))),
              (Global "FSucc", VPi_ VNat_ (\ n -> VPi_ (VFin_ n) (\ f ->
-                             VFin_ (VSucc_ n)))),
+                              VFin_ (VSucc_ n)))),
              (Global "Fin", VPi_ VNat_ (\ n -> VStar_)),
              (Global "finElim", VPi_ (VPi_ VNat_ (\ n -> VPi_ (VFin_ n) (\ _ -> VStar_))) (\ m ->
-                               VPi_ (VPi_ VNat_ (\ n -> m `vapp_` (VSucc_ n) `vapp_` (VFZero_ n))) (\ _ ->
-                               VPi_ (VPi_ VNat_ (\ n -> VPi_ (VFin_ n) (\ f -> VPi_ (m `vapp_` n `vapp_` f) (\ _ -> m `vapp_` (VSucc_ n) `vapp_` (VFSucc_ n f))))) (\ _ ->
-                               VPi_ VNat_ (\ n -> VPi_ (VFin_ n) (\ f ->
-                               m `vapp_` n `vapp_` f))))))]
+                                VPi_ (VPi_ VNat_ (\ n -> m `vapp_` (VSucc_ n) `vapp_` (VFZero_ n))) (\ _ ->
+                                VPi_ (VPi_ VNat_ (\ n -> VPi_ (VFin_ n) (\ f -> VPi_ (m `vapp_` n `vapp_` f) (\ _ -> m `vapp_` (VSucc_ n) `vapp_` (VFSucc_ n f))))) (\ _ ->
+                                VPi_ VNat_ (\ n -> VPi_ (VFin_ n) (\ f ->
+                                m `vapp_` n `vapp_` f))))))]
 
 data FullContext = FullContext { types :: Ctx Value_, values :: Ctx Value_ }
 
@@ -95,7 +122,8 @@ lpve =      [(Global "Zero", VZero_),
              (Global "Succ", VLam_ (\ n -> VSucc_ n)),
              (Global "Nat", VNat_),
              (Global "natElim", cEval_ (Lam_ (Lam_ (Lam_ (Lam_ (Inf_ (NatElim_ (Inf_ (Bound_ 3)) (Inf_ (Bound_ 2)) (Inf_ (Bound_ 1)) (Inf_ (Bound_ 0)))))))) ([], [])),
-             (Global "Poly", VPoly_),
+             (Global "Poly", trace "getting the value poly" VPoly_), -- The value for the type Poly
+             (Global "MkPoly", VLam_ (\ty -> VLam_ (\fy -> VMkPoly_ ty fy))), -- poly constructor
              (Global "Type", VStar_),
              (Global "Sigma", VLam_ (\a -> VLam_ (\b -> VSigma_ a b))),
              (Global "MkSigma", VLam_ (\a -> VLam_
@@ -108,6 +136,16 @@ lpve =      [(Global "Zero", VZero_),
                                 (Inf_ (Bound_ 2))
                                 (Inf_ (Bound_ 1))
                                 (Inf_ (Bound_ 0)))
+                 ) ([],[])),
+
+             (Global "Bool", VBool),
+             (Global "True", VTrue),
+             (Global "False", VFalse),
+             (Global "if", cEval_ (Lam_ $ Lam_ $ Lam_ $ Lam_ $
+                 Inf_ (If (Inf_ (Bound_ 3))
+                          (Inf_ (Bound_ 2))
+                          (Inf_ (Bound_ 1))
+                          (Inf_ (Bound_ 0)))
                  ) ([],[])),
              (Global "Nil", VLam_ (\ a -> VNil_ a)),
              (Global "Cons", VLam_ (\ a -> VLam_ (\ n -> VLam_ (\ x -> VLam_ (\ xs ->
@@ -122,8 +160,6 @@ lpve =      [(Global "Zero", VZero_),
              (Global "Fin", VLam_ (\ n -> VFin_ n)),
              (Global "finElim", cEval_ (Lam_ (Lam_ (Lam_ (Lam_ (Lam_ (Inf_ (FinElim_ (Inf_ (Bound_ 4)) (Inf_ (Bound_ 3)) (Inf_ (Bound_ 2)) (Inf_ (Bound_ 1)) (Inf_ (Bound_ 0))))))))) ([],[]))]
 
-bigContext :: [(key, v1)] -> [(key, v2)] -> [(key, (v1, v2))]
-bigContext c1 c2 = undefined
 
 lpassume state@(out, ve, te) x t =
   -- x: String, t: CTerm

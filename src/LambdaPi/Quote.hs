@@ -10,31 +10,32 @@ quote0_ :: Value_ -> CTerm_
 quote0_ = quote_ 0
 
 quote_ :: Int -> Value_ -> CTerm_
-quote_ ii (VLam_ t)
-  =     Lam_ (quote_ (ii + 1) (t (vfree_ (Quote ii))))
+quote_ ii (VLam_ t)           = Lam_ (quote_ (ii + 1) (t (vfree_ (Quote ii))))
+quote_ ii VStar_              = Inf_ Star_
+quote_ ii (VPi_ v f)          =  Inf_ (Pi_ (quote_ ii v)
+                                           (quote_ (ii + 1) (f (vfree_ (Quote ii)))))
+quote_ ii (VNeutral_ n)       = Inf_ (neutralQuote_ ii n)
+quote_ ii VNat_               = Inf_ Nat_
+quote_ ii VZero_              = Zero_
+quote_ ii (VSucc_ n)          = Succ_ (quote_ ii n)
+quote_ ii (VSigma_ x f)       = Inf_ (Sigma_ (quote_ ii x) (quote_ ii f))
+quote_ ii (VComma_ ty sy x f) = Comma_ (quote_ ii ty) (quote_ ii sy)
+                                       (quote_ ii x) (quote_ ii f)
+quote_ ii VPoly_              = Inf_ Poly_
+quote_ ii (VMkPoly_ s p)      = MkPoly_ (quote_ ii s) (quote_ ii p)
+quote_ ii (VVec_ a n)         = Inf_ (Vec_ (quote_ ii a) (quote_ ii n))
+quote_ ii (VNil_ a)           = Nil_ (quote_ ii a)
+quote_ ii (VCons_ a n x xs)   = Cons_  (quote_ ii a) (quote_ ii n)
+                                       (quote_ ii x) (quote_ ii xs)
+quote_ ii (VEq_ a x y)        = Inf_ (Eq_ (quote_ ii a) (quote_ ii x) (quote_ ii y))
+quote_ ii (VRefl_ a x)        = Refl_ (quote_ ii a) (quote_ ii x)
+quote_ ii (VFin_ n)           = Inf_ (Fin_ (quote_ ii n))
+quote_ ii (VFZero_ n)         = FZero_ (quote_ ii n)
+quote_ ii (VFSucc_ n f)       = FSucc_  (quote_ ii n) (quote_ ii f)
+quote_ ii VBool               = Inf_ IBool
+quote_ ii VTrue               = CTrue
+quote_ ii VFalse              = CFalse
 
-quote_ ii VStar_ = Inf_ Star_
-quote_ ii (VPi_ v f)
-    =  Inf_ (Pi_ (quote_ ii v) (quote_ (ii + 1) (f (vfree_ (Quote ii)))))
-quote_ ii (VNeutral_ n)
-  =     Inf_ (neutralQuote_ ii n)
-quote_ ii VNat_       =  Inf_ Nat_
-quote_ ii VZero_      =  Zero_
-quote_ ii (VSucc_ n)  =  Succ_ (quote_ ii n)
-quote_ ii (VSigma_ x f) =  Inf_ (Sigma_ (quote_ ii x) (quote_ ii f))
-quote_ ii (VComma_ ty sy x f) =  Comma_ (quote_ ii ty) (quote_ ii sy)
-                                        (quote_ ii x) (quote_ ii f)
-quote_ ii VPoly_      =  Inf_ Poly_
-quote_ ii (VMkPoly_ s p) =  MkPoly_ (quote_ ii s) (quote_ ii p)
-quote_ ii (VVec_ a n)         =  Inf_ (Vec_ (quote_ ii a) (quote_ ii n))
-quote_ ii (VNil_ a)           =  Nil_ (quote_ ii a)
-quote_ ii (VCons_ a n x xs)   =  Cons_  (quote_ ii a) (quote_ ii n)
-                                        (quote_ ii x) (quote_ ii xs)
-quote_ ii (VEq_ a x y)  =  Inf_ (Eq_ (quote_ ii a) (quote_ ii x) (quote_ ii y))
-quote_ ii (VRefl_ a x)  =  Refl_ (quote_ ii a) (quote_ ii x)
-quote_ ii (VFin_ n)           =  Inf_ (Fin_ (quote_ ii n))
-quote_ ii (VFZero_ n)         =  FZero_ (quote_ ii n)
-quote_ ii (VFSucc_ n f)       =  FSucc_  (quote_ ii n) (quote_ ii f)
 neutralQuote_ :: Int -> Neutral_ -> ITerm_
 neutralQuote_ ii (NFree_ v)
    =  boundfree_ ii v
@@ -58,6 +59,8 @@ neutralQuote_ ii (NFinElim_ m mz ms n f)
    =  FinElim_ (quote_ ii m)
                (quote_ ii mz) (quote_ ii ms)
                (quote_ ii n) (Inf_ (neutralQuote_ ii f))
+neutralQuote_ ii (NIf m th el b)
+   = If (quote_ ii m) (quote_ ii th) (quote_ ii el) (Inf_ (neutralQuote_ ii b))
 
 boundfree_ :: Int -> Name -> ITerm_
 boundfree_ ii (Quote k)     =  Bound_ ((ii - k - 1) `max` 0)

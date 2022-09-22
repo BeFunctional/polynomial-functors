@@ -29,6 +29,7 @@ iPrint_ p ii (FinElim_ m mz ms n f)
 iPrint_ p ii (Sigma_ x y)      =  iPrint_ p ii (Free_ (Global "Sigma") :$: x :$: y)
 iPrint_ p ii (SigElim_ c y m f v)
                                =  iPrint_ p ii (Free_ (Global "SigElim") :$: c :$: y :$: m :$: f :$: v)
+iPrint_ p ii IBool             =  text "Bool"
 iPrint_ p ii x                 =  text ("[" ++ show x ++ "]")
 
 cPrint_ :: Int -> Int -> CTerm_ -> Doc
@@ -44,6 +45,9 @@ cPrint_ p ii (FZero_ n)  = iPrint_ p ii (Free_ (Global "FZero") :$: n)
 cPrint_ p ii (FSucc_ n f)= iPrint_ p ii (Free_ (Global "FSucc") :$: n :$: f)
 cPrint_ p ii (MkPoly_ x y) = iPrint_ p ii (Free_ (Global "MkPoly") :$: x :$: y)
 cPrint_ p ii (Comma_ ty sy x y) = iPrint_ p ii (Free_ (Global "MkSigma") :$: ty :$: sy :$: x :$: y)
+cPrint_ p ii CTrue  = text "True"
+cPrint_ p ii CFalse  = text "False"
+
 fromNat_ :: Int -> Int -> CTerm_ -> Doc
 fromNat_ n ii Zero_ = int n
 fromNat_ n ii (Succ_ k) = fromNat_ (n + 1) ii k

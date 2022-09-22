@@ -14,6 +14,8 @@ data CTerm_
    |  FSucc_ CTerm_ CTerm_
    |  MkPoly_ CTerm_ CTerm_ -- constructor poly
    |  Comma_ CTerm_ CTerm_ CTerm_ CTerm_ -- constructor for Sigma
+   |  CTrue
+   |  CFalse
   deriving (Show, Eq)
 
 data ITerm_
@@ -35,6 +37,10 @@ data ITerm_
    |  PolyElim_ CTerm_ CTerm_ CTerm_ -- Eliminator for Poly
    |  Sigma_ CTerm_ CTerm_ -- Type of Σ
    |  SigElim_ CTerm_ CTerm_ CTerm_ CTerm_ CTerm_ -- Eliminator for Sigma
+   |  IBool
+   |  ITrue
+   |  IFalse
+   |  If CTerm_ CTerm_ CTerm_ CTerm_ -- dependent if
   deriving (Show, Eq)
 
 data Value_
@@ -57,6 +63,9 @@ data Value_
    |  VMkPoly_ Value_ Value_ -- Constructor for poly
    |  VSigma_ Value_ Value_ -- Type Sigma
    |  VComma_ Value_ Value_ Value_ Value_ -- Consturctor for Sigma
+   |  VBool
+   |  VTrue
+   |  VFalse
 
 data Neutral_
    =  NFree_  Name
@@ -67,6 +76,7 @@ data Neutral_
    |  NFinElim_ Value_ Value_ Value_ Value_ Neutral_
    |  NPolyElim Value_ Value_ Neutral_
    |  NSigElim_ Value_ Value_ Value_ Value_ Neutral_
+   |  NIf Value_ Value_ Value_ Neutral_
 
 type Env_ = [Value_]
 type Type_     =  Value_
@@ -76,7 +86,7 @@ type Context_    =  [(Name, Type_)]
 vapp_ :: Value_ -> Value_ -> Value_
 vapp_ (VLam_ f)      v  =  f v
 vapp_ (VNeutral_ n)  v  =  VNeutral_ (NApp_ n v)
-vapp_ n v = error "tried to apply to something that is not a lambda nor a neutral term"
+vapp_ n v = error $ "tried to apply to something that is not a lambda nor a neutral term"
 
 vfree_ :: Name -> Value_
 vfree_ n = VNeutral_ (NFree_ n)

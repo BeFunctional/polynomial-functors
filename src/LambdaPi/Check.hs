@@ -36,7 +36,7 @@ iType_ ii g (e1 :$: e2)
             case si of
               VPi_  ty ty1  ->  do  cType_ ii g e2 ty
                                     return ( ty1 (cEval_ e2 (fst g, [])))
-              _                  ->  throwError "illegal application"
+              _                  -> throwError $ "illegal application : " ++ show e2 ++ "applyed to " ++ show e1
 iType_ ii g Nat_                  =  return VStar_
 iType_ ii g (NatElim_ m mz ms n)  =
   do  cType_ ii g m (VPi_ VNat_ (const VStar_))
@@ -65,7 +65,7 @@ iType_ ii g (SigElim_ ty fty m f p) = do
   let product = cEval_ p (fst g, [])
   return $ mVal `vapp_` product
 
-iType_ ii g Poly_             = return VPoly_
+iType_ ii g Poly_             = return VStar_ -- Poly is a type
 iType_ ii g (PolyElim_ m f c) =
   do cType_ ii g m (VPi_ VPoly_ (\_ -> VStar_)) -- check the motive
      let mVal = cEval_ m (fst g, []) -- quote the motive
@@ -162,7 +162,6 @@ cType_ ii g (Comma_ ty sy x f) (VSigma_ ty' fy') = do
                     ++ "given: " ++ render (cPrint_ 0 0 (quote0_ xVal)) ++ "\n"
                     ++ "expected: " ++ render (cPrint_ 0 0 (quote0_ ty')) ++ "\n")
 
-
 cType_ ii g (MkPoly_ x f) VPoly_ =
   do cType_ ii g x VStar_ -- check if the first argument is a type
      let xVal = cEval_ x (fst g, [])
@@ -239,15 +238,20 @@ iSubst_ ii r  (FinElim_ m mz ms n f)
                               =  FinElim_ (cSubst_ ii r m)
                                           (cSubst_ ii r mz) (cSubst_ ii r ms)
                                           (cSubst_ ii r n) (cSubst_ ii r f)
+iSubst_ ii r (Poly_) = Poly_
+iSubst_ ii r v = error $ "unhandled substitution: " ++ show v
+
 cSubst_ :: Int -> ITerm_ -> CTerm_ -> CTerm_
-cSubst_ ii i' (Inf_ i)      =  Inf_ (iSubst_ ii i' i)
-cSubst_ ii i' (Lam_ c)      =  Lam_ (cSubst_ (ii + 1) i' c)
-cSubst_ ii r  Zero_         =  Zero_
-cSubst_ ii r  (Succ_ n)     =  Succ_ (cSubst_ ii r n)
-cSubst_ ii r  (Nil_ a)      =  Nil_ (cSubst_ ii r a)
+cSubst_ ii i' (Inf_ i)      = Inf_ (iSubst_ ii i' i)
+cSubst_ ii i' (Lam_ c)      = Lam_ (cSubst_ (ii + 1) i' c)
+cSubst_ ii r  Zero_         = Zero_
+cSubst_ ii r  (Succ_ n)     = Succ_ (cSubst_ ii r n)
+cSubst_ ii r  (Nil_ a)      = Nil_ (cSubst_ ii r a)
 cSubst_ ii r  (Cons_ a n x xs)
-                            =  Cons_ (cSubst_ ii r a) (cSubst_ ii r n)
-                                     (cSubst_ ii r x) (cSubst_ ii r xs)
-cSubst_ ii r  (Refl_ a x)   =  Refl_ (cSubst_ ii r a) (cSubst_ ii r x)
-cSubst_ ii r  (FZero_ n)    =  FZero_ (cSubst_ ii r n)
-cSubst_ ii r  (FSucc_ n k)  =  FSucc_ (cSubst_ ii r n) (cSubst_ ii r k)
+                            = Cons_ (cSubst_ ii r a) (cSubst_ ii r n)
+                                    (cSubst_ ii r x) (cSubst_ ii r xs)
+cSubst_ ii r  (Refl_ a x)   = Refl_ (cSubst_ ii r a) (cSubst_ ii r x)
+cSubst_ ii r  (FZero_ n)    = FZero_ (cSubst_ ii r n)
+cSubst_ ii r  (FSucc_ n k)  = FSucc_ (cSubst_ ii r n) (cSubst_ ii r k)
+cSubst_ ii r  CTrue         = CTrue
+cSubst_ ii r  CFalse        = CFalse
