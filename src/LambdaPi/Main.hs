@@ -27,7 +27,7 @@ lpte =      [(Global "Zero", VNat_),
              ------------------------------------------------------
              -- Polynomial things
              ------------------------------------------------------
-             (Global "Poly", trace "getting the type poly" VStar_), -- Poly is a type
+             (Global "Poly", VStar_), -- Poly is a type
              (Global "MkPoly", VPi_ VStar_ (\s -> VPi_ (VPi_ s (const VStar_)) (const VPoly_))),
              (Global "polyElim", VPi_ (VPi_ VPoly_ (const VStar_)) (\motive ->  -- motive
                                  VPi_ (VPi_ VStar_ (\sh ->                      -- \
@@ -122,7 +122,7 @@ lpve =      [(Global "Zero", VZero_),
              (Global "Succ", VLam_ (\ n -> VSucc_ n)),
              (Global "Nat", VNat_),
              (Global "natElim", cEval_ (Lam_ (Lam_ (Lam_ (Lam_ (Inf_ (NatElim_ (Inf_ (Bound_ 3)) (Inf_ (Bound_ 2)) (Inf_ (Bound_ 1)) (Inf_ (Bound_ 0)))))))) ([], [])),
-             (Global "Poly", trace "getting the value poly" VPoly_), -- The value for the type Poly
+             (Global "Poly", VPoly_), -- The value for the type Poly
              (Global "MkPoly", VLam_ (\ty -> VLam_ (\fy -> VMkPoly_ ty fy))), -- poly constructor
              (Global "Type", VStar_),
              (Global "Sigma", VLam_ (\a -> VLam_ (\b -> VSigma_ a b))),
