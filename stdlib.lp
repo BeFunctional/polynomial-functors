@@ -62,4 +62,16 @@ let multiplication = (\p1 p2 ->
                                 (\p1 p2 -> Either (pos1 p1) (pos2 p2))))
               p2)
             p1) :: Poly -> Poly -> Poly
+let choice = (\p1 p2 ->
+   polyElim (\_ -> Poly)
+            (\shp1 pos1 -> polyElim
+              (\_ -> Poly)
+              (\shp2 pos2 ->
+                MkPoly (Either shp1 shp2)
+                       (eitherElim shp1 shp2
+                          (\e -> Type)
+                          pos1
+                          pos2))
+              p2)
+            p1) :: Poly -> Poly -> Poly
 
