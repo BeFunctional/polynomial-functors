@@ -40,6 +40,7 @@ executable lp
     other-modules:
         Common
         REPL
+        LambdaPi.Main
         LambdaPi.AST
         LambdaPi.Check
         LambdaPi.Eval

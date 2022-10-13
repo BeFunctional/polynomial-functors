@@ -73,8 +73,8 @@ parseIO f p x = case P.parse (whiteSpace dummy >> p >>= \ x -> eof >> return x) 
                   Right r -> return (Just r)
 
 
-readevalprint :: Interpreter i c v t tinf inf -> State v inf -> IO ()
-readevalprint int state@(out, ve, te) =
+readevalprint :: Maybe String -> Interpreter i c v t tinf inf -> State v inf -> IO ()
+readevalprint stdlib int state@(out, ve, te) =
   let rec int state =
         do
           putStr (iprompt int)
@@ -94,8 +94,11 @@ readevalprint int state@(out, ve, te) =
       --  welcome
       putStrLn ("Interpreter for " ++ iname int ++ ".\n" ++
                              "Type :? for help.")
-      --  enter loop
-      rec int state
+      case stdlib of
+           Nothing -> rec int state
+           Just lib -> do
+             state' <- handleCommand int state (Compile $ CompileFile lib)
+             maybe (return ()) (rec int) state'
 
 interpretCommand :: String -> IO Command
 interpretCommand x

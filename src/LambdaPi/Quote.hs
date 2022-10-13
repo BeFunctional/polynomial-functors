@@ -3,65 +3,65 @@ module LambdaPi.Quote where
 import Common
 import LambdaPi.AST
 
-instance Show Value_ where
-  show = show . quote0_
+instance Show Value where
+  show = show . quote0
 
-quote0_ :: Value_ -> CTerm_
-quote0_ = quote_ 0
+quote0 :: Value -> CTerm
+quote0 = quote 0
 
-quote_ :: Int -> Value_ -> CTerm_
-quote_ ii (VLam_ t)           = Lam_ (quote_ (ii + 1) (t (vfree_ (Quote ii))))
-quote_ ii VStar_              = Inf_ Star_
-quote_ ii (VPi_ v f)          =  Inf_ (Pi_ (quote_ ii v)
-                                           (quote_ (ii + 1) (f (vfree_ (Quote ii)))))
-quote_ ii (VNeutral_ n)       = Inf_ (neutralQuote_ ii n)
-quote_ ii VNat_               = Inf_ Nat_
-quote_ ii VZero_              = Zero_
-quote_ ii (VSucc_ n)          = Succ_ (quote_ ii n)
-quote_ ii (VSigma_ x f)       = Inf_ (Sigma_ (quote_ ii x) (quote_ ii f))
-quote_ ii (VComma_ ty sy x f) = Comma_ (quote_ ii ty) (quote_ ii sy)
-                                       (quote_ ii x) (quote_ ii f)
-quote_ ii VPoly_              = Inf_ Poly_
-quote_ ii (VMkPoly_ s p)      = MkPoly_ (quote_ ii s) (quote_ ii p)
-quote_ ii (VVec_ a n)         = Inf_ (Vec_ (quote_ ii a) (quote_ ii n))
-quote_ ii (VNil_ a)           = Nil_ (quote_ ii a)
-quote_ ii (VCons_ a n x xs)   = Cons_  (quote_ ii a) (quote_ ii n)
-                                       (quote_ ii x) (quote_ ii xs)
-quote_ ii (VEq_ a x y)        = Inf_ (Eq_ (quote_ ii a) (quote_ ii x) (quote_ ii y))
-quote_ ii (VRefl_ a x)        = Refl_ (quote_ ii a) (quote_ ii x)
-quote_ ii (VFin_ n)           = Inf_ (Fin_ (quote_ ii n))
-quote_ ii (VFZero_ n)         = FZero_ (quote_ ii n)
-quote_ ii (VFSucc_ n f)       = FSucc_  (quote_ ii n) (quote_ ii f)
-quote_ ii VBool               = Inf_ IBool
-quote_ ii VTrue               = CTrue
-quote_ ii VFalse              = CFalse
+quote :: Int -> Value -> CTerm
+quote ii (VLam t)           = Lam (quote (ii + 1) (t (vfree (Quote ii))))
+quote ii VStar              = Inf Star
+quote ii (VPi v f)          =  Inf (Pi (quote ii v)
+                                           (quote (ii + 1) (f (vfree (Quote ii)))))
+quote ii (VNeutral n)       = Inf (neutralQuote ii n)
+quote ii VNat               = Inf Nat
+quote ii VZero              = Zero
+quote ii (VSucc n)          = Succ (quote ii n)
+quote ii (VSigma x f)       = Inf (Sigma (quote ii x) (quote ii f))
+quote ii (VComma ty sy x f) = Comma (quote ii ty) (quote ii sy)
+                                       (quote ii x) (quote ii f)
+quote ii VPoly              = Inf Poly
+quote ii (VMkPoly s p)      = MkPoly (quote ii s) (quote ii p)
+quote ii (VVec a n)         = Inf (Vec (quote ii a) (quote ii n))
+quote ii (VNil a)           = Nil (quote ii a)
+quote ii (VCons a n x xs)   = Cons  (quote ii a) (quote ii n)
+                                       (quote ii x) (quote ii xs)
+quote ii (VEq a x y)        = Inf (Eq (quote ii a) (quote ii x) (quote ii y))
+quote ii (VRefl a x)        = Refl (quote ii a) (quote ii x)
+quote ii (VFin n)           = Inf (Fin (quote ii n))
+quote ii (VFZero n)         = FZero (quote ii n)
+quote ii (VFSucc n f)       = FSucc  (quote ii n) (quote ii f)
+quote ii VBool               = Inf IBool
+quote ii VTrue               = CTrue
+quote ii VFalse              = CFalse
 
-neutralQuote_ :: Int -> Neutral_ -> ITerm_
-neutralQuote_ ii (NFree_ v)
-   =  boundfree_ ii v
-neutralQuote_ ii (NApp_ n v)
-   =  neutralQuote_ ii n :$: quote_ ii v
-neutralQuote_ ii (NNatElim_ m z s n)
-   =  NatElim_ (quote_ ii m) (quote_ ii z) (quote_ ii s) (Inf_ (neutralQuote_ ii n))
-neutralQuote_ ii (NSigElim_ sy ty motive f arg)
-   =  SigElim_ (quote_ ii sy) (quote_ ii ty)
-               (quote_ ii motive) (quote_ ii f)
-               (Inf_ (neutralQuote_ ii arg))
-neutralQuote_ ii (NVecElim_ a m mn mc n xs)
-   =  VecElim_ (quote_ ii a) (quote_ ii m)
-               (quote_ ii mn) (quote_ ii mc)
-               (quote_ ii n) (Inf_ (neutralQuote_ ii xs))
-neutralQuote_ ii (NEqElim_ a m mr x y eq)
-   =  EqElim_  (quote_ ii a) (quote_ ii m) (quote_ ii mr)
-               (quote_ ii x) (quote_ ii y)
-               (Inf_ (neutralQuote_ ii eq))
-neutralQuote_ ii (NFinElim_ m mz ms n f)
-   =  FinElim_ (quote_ ii m)
-               (quote_ ii mz) (quote_ ii ms)
-               (quote_ ii n) (Inf_ (neutralQuote_ ii f))
-neutralQuote_ ii (NIf m th el b)
-   = If (quote_ ii m) (quote_ ii th) (quote_ ii el) (Inf_ (neutralQuote_ ii b))
+neutralQuote :: Int -> Neutral -> ITerm
+neutralQuote ii (NFree v)
+   =  boundfree ii v
+neutralQuote ii (NApp n v)
+   =  neutralQuote ii n :$: quote ii v
+neutralQuote ii (NNatElim m z s n)
+   =  NatElim (quote ii m) (quote ii z) (quote ii s) (Inf (neutralQuote ii n))
+neutralQuote ii (NSigElim sy ty motive f arg)
+   =  SigElim (quote ii sy) (quote ii ty)
+               (quote ii motive) (quote ii f)
+               (Inf (neutralQuote ii arg))
+neutralQuote ii (NVecElim a m mn mc n xs)
+   =  VecElim (quote ii a) (quote ii m)
+               (quote ii mn) (quote ii mc)
+               (quote ii n) (Inf (neutralQuote ii xs))
+neutralQuote ii (NEqElim a m mr x y eq)
+   =  EqElim  (quote ii a) (quote ii m) (quote ii mr)
+               (quote ii x) (quote ii y)
+               (Inf (neutralQuote ii eq))
+neutralQuote ii (NFinElim m mz ms n f)
+   =  FinElim (quote ii m)
+               (quote ii mz) (quote ii ms)
+               (quote ii n) (Inf (neutralQuote ii f))
+neutralQuote ii (NIf m th el b)
+   = If (quote ii m) (quote ii th) (quote ii el) (Inf (neutralQuote ii b))
 
-boundfree_ :: Int -> Name -> ITerm_
-boundfree_ ii (Quote k)     =  Bound_ ((ii - k - 1) `max` 0)
-boundfree_ ii x             =  Free_ x
+boundfree :: Int -> Name -> ITerm
+boundfree ii (Quote k)     =  Bound ((ii - k - 1) `max` 0)
+boundfree ii x             =  Free x
