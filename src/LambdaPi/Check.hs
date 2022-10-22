@@ -210,36 +210,43 @@ cType ii g a v
              ++ " type expected: " ++ render (cPrint 0 0 (quote0 v)) ++ "\n"
 
 iSubst :: Int -> ITerm -> ITerm -> ITerm
-iSubst ii i'   (Ann c c')     =  Ann (cSubst ii i' c) (cSubst ii i' c')
-
+iSubst ii i' (Ann c c')     =  Ann (cSubst ii i' c) (cSubst ii i' c')
 iSubst ii r  Star           =  Star
 iSubst ii r  (Pi ty ty')    =  Pi  (cSubst ii r ty) (cSubst (ii + 1) r ty')
 iSubst ii i' (Bound j)      =  if ii == j then i' else Bound j
 iSubst ii i' (Free y)       =  Free y
-iSubst ii i' (i :$: c)       =  (iSubst ii i' i) :$: (cSubst ii i' c)
+iSubst ii i' (i :$: c)      =  (iSubst ii i' i) :$: (cSubst ii i' c)
 iSubst ii r  Nat            =  Nat
 iSubst ii r  (NatElim m mz ms n)
-                              =  NatElim (cSubst ii r m)
-                                          (cSubst ii r mz) (cSubst ii r ms)
-                                          (cSubst ii r n)
+                            =  NatElim (cSubst ii r m)
+                                       (cSubst ii r mz) (cSubst ii r ms)
+                                       (cSubst ii r n)
 iSubst ii r  (Vec a n)      =  Vec (cSubst ii r a) (cSubst ii r n)
 iSubst ii r  (VecElim a m mn mc n xs)
-                              =  VecElim (cSubst ii r a) (cSubst ii r m)
-                                          (cSubst ii r mn) (cSubst ii r mc)
-                                          (cSubst ii r n) (cSubst ii r xs)
+                            =  VecElim (cSubst ii r a) (cSubst ii r m)
+                                       (cSubst ii r mn) (cSubst ii r mc)
+                                       (cSubst ii r n) (cSubst ii r xs)
 iSubst ii r  (Eq a x y)     =  Eq (cSubst ii r a)
                                      (cSubst ii r x) (cSubst ii r y)
 iSubst ii r  (EqElim a m mr x y eq)
-                              =  EqElim (cSubst ii r a) (cSubst ii r m)
-                                          (cSubst ii r mr) (cSubst ii r x)
-                                          (cSubst ii r y) (cSubst ii r eq)
+                            =  EqElim (cSubst ii r a) (cSubst ii r m)
+                                        (cSubst ii r mr) (cSubst ii r x)
+                                        (cSubst ii r y) (cSubst ii r eq)
 iSubst ii r  (Fin n)        =  Fin (cSubst ii r n)
 iSubst ii r  (FinElim m mz ms n f)
-                              =  FinElim (cSubst ii r m)
-                                          (cSubst ii r mz) (cSubst ii r ms)
-                                          (cSubst ii r n) (cSubst ii r f)
-iSubst ii r (Poly) = Poly
-iSubst ii r v = error $ "unhandled substitution: " ++ show v
+                            =  FinElim (cSubst ii r m)
+                                        (cSubst ii r mz) (cSubst ii r ms)
+                                        (cSubst ii r n) (cSubst ii r f)
+iSubst ii r Poly             = Poly
+iSubst ii r (PolyElim m t a) = PolyElim (cSubst ii r m) (cSubst ii r t) (cSubst ii r a)
+iSubst ii r (Sigma f s)      = Sigma (cSubst ii r f)(cSubst ii r s)
+iSubst ii r (SigElim t1 t2 m f p)
+                             = SigElim (cSubst ii r t1) (cSubst ii r t2)
+                                       (cSubst ii r m) (cSubst ii r f)
+                                       (cSubst ii r p)
+iSubst ii r IBool            = IBool
+iSubst ii r IFalse           = IFalse
+iSubst ii r ITrue            = ITrue
 
 cSubst :: Int -> ITerm -> CTerm -> CTerm
 cSubst ii i' (Inf i)      = Inf (iSubst ii i' i)
@@ -248,10 +255,15 @@ cSubst ii r  Zero         = Zero
 cSubst ii r  (Succ n)     = Succ (cSubst ii r n)
 cSubst ii r  (Nil a)      = Nil (cSubst ii r a)
 cSubst ii r  (Cons a n x xs)
-                            = Cons (cSubst ii r a) (cSubst ii r n)
-                                    (cSubst ii r x) (cSubst ii r xs)
+                          = Cons (cSubst ii r a) (cSubst ii r n)
+                                 (cSubst ii r x) (cSubst ii r xs)
 cSubst ii r  (Refl a x)   = Refl (cSubst ii r a) (cSubst ii r x)
 cSubst ii r  (FZero n)    = FZero (cSubst ii r n)
 cSubst ii r  (FSucc n k)  = FSucc (cSubst ii r n) (cSubst ii r k)
-cSubst ii r  CTrue         = CTrue
-cSubst ii r  CFalse        = CFalse
+cSubst ii r  CTrue        = CTrue
+cSubst ii r  CFalse       = CFalse
+cSubst ii r  (MkPoly s p) = MkPoly (cSubst ii r s) (cSubst ii r p)
+cSubst ii r  (Comma t1 t2 v1 v2)
+                          = Comma (cSubst ii r t1) (cSubst ii r t2)
+                                  (cSubst ii r v1) (cSubst ii r v2)
+

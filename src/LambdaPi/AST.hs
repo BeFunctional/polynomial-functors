@@ -12,7 +12,7 @@ data CTerm
    |  Refl CTerm CTerm
    |  FZero CTerm
    |  FSucc CTerm CTerm
-   |  MkPoly CTerm CTerm -- constructor poly
+   |  MkPoly CTerm CTerm            -- constructor poly
    |  Comma CTerm CTerm CTerm CTerm -- constructor for Sigma
    |  CTrue
    |  CFalse

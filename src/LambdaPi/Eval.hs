@@ -24,8 +24,8 @@ iEval :: ITerm -> (NameEnv Value,Env) -> Value
 iEval (Ann c _)     d  =  cEval c d
 iEval Star          d  =  VStar
 iEval (Pi ty ty1)   d  =  VPi (cEval ty d) (\ x -> cEval ty1 (((\(e, d) -> (e,  (x : d))) d)))
-iEval (Free x)      d  =  case lookup x (fst d) of Nothing ->  (vfree x); Just v -> v
 iEval (Bound ii)    d  =  (snd d) !! ii
+iEval (Free x)      d  =  case lookup x (fst d) of Nothing ->  (vfree x); Just v -> v
 iEval (i :$: c)     d  =  vapp (iEval i d) (cEval c d)
 iEval Nat           d  =  VNat
 iEval (NatElim m mz ms n) d
@@ -39,13 +39,6 @@ iEval (NatElim m mz ms n) d
                                (NNatElim (cEval m d) mzVal msVal n)
               _           ->  error "internal: eval natElim"
      in   rec (cEval n d)
-iEval Poly          d  =  VPoly
-iEval (PolyElim m f c) d
-  = let fn = cEval f d in case (cEval c d) of
-        VMkPoly sh ps -> (fn `vapp` sh) `vapp` ps
-        VNeutral n     -> VNeutral (NPolyElim (cEval m d) fn n)
-        _ -> error "internal: Eval container"
-
 iEval (Vec a n)     d  =  VVec (cEval a d) (cEval n d)
 iEval (VecElim a m mn mc n xs) d =
   let  mnVal  =  cEval mn d
@@ -83,15 +76,24 @@ iEval (FinElim m mz ms n f)  d  =
                                             (cEval ms d) (cEval n d) n')
            _               ->  error "internal: eval finElim"
   in   rec (cEval f d)
+iEval Poly             d = VPoly
+iEval (PolyElim m f c) d
+  = let fn = cEval f d in case (cEval c d) of
+        VMkPoly sh ps -> (fn `vapp` sh) `vapp` ps
+        VNeutral n     -> VNeutral (NPolyElim (cEval m d) fn n)
+        _ -> error "internal: Eval container"
+iEval (Sigma t1 t2) d = VSigma (cEval t1 d) (cEval t2 d)
+iEval (SigElim ty sy motive f arg) d =
+  let fn = cEval f d in case (cEval arg d) of
+        VComma ty sy a b -> (fn `vapp` a) `vapp` b
+        VNeutral n       -> VNeutral (NSigElim (cEval ty d) (cEval sy d) (cEval motive d) fn n)
+        _ -> error "internal: Eval container"
 iEval IBool d = VBool
+iEval ITrue d = VTrue
+iEval IFalse d = VFalse
 iEval (If m th el bool) d =
   case cEval bool d of
     VTrue -> cEval th d
     VFalse -> cEval el d
     VNeutral n -> VNeutral (NIf (cEval m d) (cEval th d) (cEval el d) n)
     n -> error $ "internal: if on non-bool " ++ show (quote0 n)
-iEval (SigElim ty sy motive f arg) d =
-  let fn = cEval f d in case (cEval arg d) of
-        VComma ty sy a b -> trace "found constructor" $ (fn `vapp` a) `vapp` b
-        VNeutral n       -> trace "found neutral term" $ VNeutral (NSigElim (cEval ty d) (cEval sy d) (cEval motive d) fn n)
-        _ -> error "internal: Eval container"
