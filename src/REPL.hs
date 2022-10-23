@@ -67,6 +67,12 @@ commands
 dummy = makeTokenParser (haskellStyle { identStart = letter <|> P.char '_',
                                               reservedNames = [] })
 
+parsePure :: String -> CharParser () a -> String -> Either String a
+parsePure filename parser content =
+  case P.parse (whiteSpace dummy >> parser >>= \x -> eof >> return x) filename content of
+    Left err -> Left (show err)
+    Right val -> Right val
+
 parseIO :: String -> CharParser () a -> String -> IO (Maybe a)
 parseIO f p x = case P.parse (whiteSpace dummy >> p >>= \ x -> eof >> return x) f x of
                   Left e  -> putStrLn (show e) >> return Nothing

@@ -13,14 +13,17 @@ lambdaPi = makeTokenParser (haskellStyle { identStart = letter <|> P.char '_',
                                            reservedNames = ["forall", "let", "assume", "putStrLn", "out"] })
 
 
+parseLet :: [String] -> CharParser () (String, ITerm)
+parseLet e =  do
+  reserved lambdaPi "let"
+  x <- identifier lambdaPi
+  reserved lambdaPi "="
+  t <- parseITerm 0 e
+  return (x, t)
+
 parseStmt :: [String] -> CharParser () (Stmt ITerm CTerm)
 parseStmt e =
-      do
-        reserved lambdaPi "let"
-        x <- identifier lambdaPi
-        reserved lambdaPi "="
-        t <- parseITerm 0 e
-        return (Let x t)
+      fmap (uncurry Let) (parseLet e)
   <|> do
         reserved lambdaPi "assume"
         (xs, ts) <- parseBindings False []

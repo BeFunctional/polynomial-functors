@@ -184,6 +184,30 @@ lp = I { iname = "lambda-Pi",
          isparse = parseStmt [],
          iassume = \ s (x, t) -> lpassume s x t }
 
+checkSimple :: State Value Value
+            -> ITerm
+            -> ((Value, Value) -> State Value Value)
+            -> (State Value Value)
+checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
+                  --  typecheck and evaluate
+                  let x = iType 0 (oldValueContext, oldTypeContext) term in
+                  case x of
+                    -- error, do not update the state
+                    Left error  -> state
+                    -- success, update the state, print the new result
+                    Right y   ->
+                        let v = iEval term (oldValueContext, [])
+                        in (updateState (y, v))
+
+checkPure :: State Value Value -> ITerm
+         -> ((Value, Value) -> State Value Value) -> Either String (State Value Value)
+checkPure state@(out, ve, te) t k =
+                do
+                  -- i: String, t: Type
+                  --  typecheck and evaluate
+                  x <- iType 0 (ve, te) t
+                  let v = iEval t (ve, [])
+                  return (k (x, v))
 repLP :: IO ()
 repLP = readevalprint Nothing lp ([], lpve, lpte)
 
