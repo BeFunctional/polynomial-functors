@@ -126,9 +126,15 @@ lpve =      [(Global "Zero", VZero),
              (Global "Succ", VLam (\ n -> VSucc n)),
              (Global "Nat", VNat),
              (Global "natElim", cEval (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ([], [])),
+             (Global "Type", VStar),
              (Global "Poly", VPoly), -- The value for the type Poly
              (Global "MkPoly", VLam (\ty -> VLam (\fy -> VMkPoly ty fy))), -- poly constructor
-             (Global "Type", VStar),
+             (Global "polyElim",
+               cEval (Lam $ Lam $ Lam $ Inf $
+                      PolyElim (Inf (Bound 2))
+                               (Inf (Bound 1))
+                               (Inf (Bound 0))
+                      ) ([],[])),
              (Global "Sigma", VLam (\a -> VLam (\b -> VSigma a b))),
              (Global "MkSigma", VLam (\a -> VLam
                                      (\b -> VLam
@@ -193,21 +199,28 @@ checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
                   let x = iType 0 (oldValueContext, oldTypeContext) term in
                   case x of
                     -- error, do not update the state
-                    Left error  -> state
+                    Left error -> state
                     -- success, update the state, print the new result
                     Right y   ->
                         let v = iEval term (oldValueContext, [])
                         in (updateState (y, v))
 
 checkPure :: State Value Value -> ITerm
-         -> ((Value, Value) -> State Value Value) -> Either String (State Value Value)
+         -> ((Value, Value) -> State Value Value)
+         -> Either String (State Value Value)
 checkPure state@(out, ve, te) t k =
                 do
                   -- i: String, t: Type
                   --  typecheck and evaluate
-                  x <- iType 0 (ve, te) t
+                  x <- iType 0 (te, ve) t
                   let v = iEval t (ve, [])
                   return (k (x, v))
+
+-- checkAdd :: State Value Value -> String -> ITerm -> Either String (State Value Value)
+-- checkAdd state@(nm, valueCtx, typeCtx) identifier term =
+--   checkPure state term (\(newTy, newVal) -> (nm, (Global identifier, newVal) : valueCtx,
+--                                                  (Global identifier, newTy) : typeCtx))
+
 repLP :: IO ()
 repLP = readevalprint Nothing lp ([], lpve, lpte)
 

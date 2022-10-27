@@ -59,6 +59,8 @@ neutralQuote ii (NFinElim m mz ms n f)
    =  FinElim (quote ii m)
                (quote ii mz) (quote ii ms)
                (quote ii n) (Inf (neutralQuote ii f))
+neutralQuote ii (NPolyElim m f val)
+   = PolyElim (quote ii m) (quote ii f) (Inf (neutralQuote ii val))
 neutralQuote ii (NIf m th el b)
    = If (quote ii m) (quote ii th) (quote ii el) (Inf (neutralQuote ii b))
 
