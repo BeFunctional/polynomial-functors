@@ -26,6 +26,7 @@ iPrint p ii (EqElim a m mr x y eq)
 iPrint p ii (Fin n)          =  iPrint p ii (Free (Global "Fin") :$: n)
 iPrint p ii (FinElim m mz ms n f)
                              =  iPrint p ii (Free (Global "finElim") :$: m :$: mz :$: ms :$: n :$: f)
+iPrint p ii (PolyElim x y z) =  iPrint p ii (Free (Global "polyElim") :$: x :$: y :$: z)
 iPrint p ii (Sigma (Inf IBool) b@(Lam (Inf (If motive thn els (Inf (Bound 0))))))  =
   if isConst 0 motive
   then text "Either" <+> cPrint p (ii + 1) thn <+> cPrint p (ii + 1) els
@@ -150,5 +151,3 @@ isConst i (Comma t1 t2 p1 p2)
   && isConst i p1
   && isConst i p2
 isConst i _ = True
-
-isConst i _ = False

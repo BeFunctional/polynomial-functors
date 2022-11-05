@@ -156,11 +156,13 @@ cType ii g (Lam e) ( VPi ty ty')
 cType ii g Zero      VNat  =  return ()
 cType ii g (Succ k)  VNat  =  cType ii g k VNat
 cType ii g (Comma ty sy x f) (VSigma ty' fy') = do
+  cType ii g x ty'
   let xVal = cEval x (fst g, [])
   unless (quote0 xVal == quote0 ty')
          (throwError $ "type mismatch:\n"
                     ++ "given: " ++ render (cPrint 0 0 (quote0 xVal)) ++ "\n"
                     ++ "expected: " ++ render (cPrint 0 0 (quote0 ty')) ++ "\n")
+  cType ii g f fy'
 
 cType ii g (MkPoly x f) VPoly =
   do cType ii g x VStar -- check if the first argument is a type

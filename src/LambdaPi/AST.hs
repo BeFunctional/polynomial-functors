@@ -10,8 +10,8 @@ data CTerm
    |  Nil CTerm
    |  Cons CTerm CTerm CTerm CTerm
    |  Refl CTerm CTerm
-   |  FZero CTerm
-   |  FSucc CTerm CTerm
+   |  FZero CTerm       -- Fin zero
+   |  FSucc CTerm CTerm -- Fin succ
    |  MkPoly CTerm CTerm            -- constructor poly
    |  Comma CTerm CTerm CTerm CTerm -- constructor for Sigma
    |  CTrue
@@ -31,7 +31,7 @@ data ITerm
    |  VecElim CTerm CTerm CTerm CTerm CTerm CTerm
    |  Eq CTerm CTerm CTerm
    |  EqElim CTerm CTerm CTerm CTerm CTerm CTerm
-   |  Fin CTerm
+   |  Fin CTerm -- Fin type
    |  FinElim CTerm CTerm CTerm CTerm CTerm
    |  Poly -- type poly
    |  PolyElim CTerm CTerm CTerm -- Eliminator for Poly
@@ -58,7 +58,7 @@ data Value
    |  VRefl Value Value
    |  VFZero Value
    |  VFSucc Value Value
-   |  VFin Value
+   |  VFin Value -- Fin Type
    |  VPoly -- Type Poly
    |  VMkPoly Value Value -- Constructor for poly
    |  VSigma Value Value -- Type Sigma

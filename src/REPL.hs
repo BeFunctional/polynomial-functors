@@ -13,6 +13,7 @@ import Text.ParserCombinators.Parsec.Language
 import System.IO hiding (print)
 import System.IO.Error
 
+import Debug.Trace
 
 import Common
 
@@ -162,19 +163,18 @@ iinfer int d g t =
     Right v -> return (Just v)
 
 handleStmt :: Interpreter i c v t tinf inf
-              -> State v inf -> Stmt i tinf -> IO (State v inf)
+           -> State v inf -> Stmt i tinf -> IO (State v inf)
 handleStmt int state@(out, ve, te) stmt =
-  do
     case stmt of
         Assume ass -> foldM (iassume int) state ass
         Let x e    -> checkEval x e
         Eval e     -> checkEval it e
-        PutStrLn x -> putStrLn x >> return state
-        Out f      -> return (f, ve, te)
+        PutStrLn x -> (putStrLn x >> return state)
+        Out f      -> (return (f, ve, te))
   where
     --  checkEval :: String -> i -> IO (State v inf)
     checkEval i t =
-      check int state i t
+      trace "checkEval" $ check int state i t
         (\ (y, v) -> do
                        --  ugly, but we have limited space in the paper
                        --  usually, you'd want to have the bound identifier *and*
@@ -184,6 +184,7 @@ handleStmt int state@(out, ve, te) stmt =
                        putStrLn outtext
                        unless (null out) (writeFile out (process outtext)))
         (\ (y, v) -> ("", (Global i, v) : ve, (Global i, ihastype int y) : te))
+
 
 check :: Interpreter i c v t tinf inf -> State v inf -> String -> i
          -> ((t, v) -> IO ()) -> ((t, v) -> State v inf) -> IO (State v inf)

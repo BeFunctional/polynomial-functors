@@ -10,20 +10,17 @@ import LambdaPi.Quote
 import LambdaPi.Parser
 import LambdaPi.Printer
 
+import Debug.Trace
+
 lpte :: Ctx Value
 lpte =      [(Global "Zero", VNat),
              (Global "Succ", VPi VNat (\_ -> VNat)),
              (Global "Nat", VStar),
-             (Global "Type", VStar),
-             -- natElim : (m : Nat -> Type) ->
-             --           (m Z) ->
-             --           ((k : Nat) -> m k -> m (S k)) ->
-             --           (n : Nat) ->
-             --           m n
              (Global "natElim", VPi (VPi VNat (\_ -> VStar)) (\m ->
                                VPi (m `vapp` VZero) (\_ ->
                                VPi (VPi VNat (\ k -> VPi (m `vapp` k) (\_ -> (m `vapp` (VSucc k))))) (\_ ->
                                VPi VNat (\ n -> m `vapp` n))))),
+             (Global "Type", VStar),
              ------------------------------------------------------
              -- Polynomial things
              ------------------------------------------------------
@@ -172,17 +169,24 @@ lpve =      [(Global "Zero", VZero),
 
 
 lpassume state@(out, ve, te) x t =
-  -- x: String, t: CTerm
+  -- t: CTerm
   check lp state x (Ann t (Inf Star))
         (\ (y, v) -> return ()) --  putStrLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 v))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
 
+printNameContext :: NameEnv Value -> String
+printNameContext = unlines . fmap (\(Global nm, ty) -> nm ++ ": " ++ show (cPrint 0 0 (quote0 ty)))
+
+printTypeContext :: Ctx Value -> String
+printTypeContext = unlines . fmap (\(Global nm, vl) -> nm ++ ":= " ++ show (cPrint 0 0 (quote0 vl)))
+
 lp :: Interpreter ITerm CTerm Value Value CTerm Value
 lp = I { iname = "lambda-Pi",
          iprompt = "LP> ",
-         iitype = \ v c -> iType 0 (v, c),
+         iitype = \ v c i -> trace ("inferring type with iType with term context:\n"
+           ++ printNameContext v ++ "\ntype context:\n" ++ printTypeContext c ++ "\nterm: " ++ (show $ iPrint 0 0 i) ++ "\n-----------\n") (iType 0 (v, c) i),
          iquote = quote0,
-         ieval = \ e x -> iEval x (e, []),
+         ieval = \ e x -> trace ("evaluating term in context \n" ++ printNameContext e ++ "\n value: " ++ show (iPrint 0 0 x) ++ "\n-----------\n")  (iEval x (e, [])),
          ihastype = id,
          icprint = cPrint 0 0,
          itprint = cPrint 0 0 . quote0,
