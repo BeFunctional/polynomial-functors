@@ -172,6 +172,7 @@ lpve =      [(Global "Zero", VZero),
 lpassume state@(out, ve, te) x t =
   -- t: CTerm
   check lp (show . cPrint 0 0 . quote0) state x (Ann t (Inf Star))
+        (\ (y, v) -> return ()) --  putStrLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 v))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
 printNameContext :: NameEnv Value -> String
 printNameContext = unlines . fmap (\(Global nm, ty) -> nm ++ ": " ++ show (cPrint 0 0 (quote0 ty)))
@@ -182,11 +183,9 @@ printTypeContext = unlines . fmap (\(Global nm, vl) -> nm ++ ":= " ++ show (cPri
 lp :: Interpreter ITerm CTerm Value Value CTerm Value
 lp = I { iname = "lambda-Pi",
          iprompt = "LP> ",
-         iitype = \ v c i -> let result = iType True 0 (v, c) i
-                             in trace ("term: " ++ (show $ iPrint 0 0 i)
-                                 ++ "\nresult: " ++ show (fmap (cPrint 0 0 . quote0) result)) result ,
+         iitype = \ v c i -> iType False 0 (v, c) i,
          iquote = quote0,
-         ieval = \ e x -> trace ("value: " ++ show (iPrint 0 0 x) ++ "\n-----------")  (iEval True x (e, [])),
+         ieval = \ e x -> iEval False x (e, []),
          ihastype = id,
          icprint = cPrint 0 0,
          itprint = cPrint 0 0 . quote0,
@@ -200,13 +199,13 @@ checkSimple :: State Value Value
             -> (State Value Value)
 checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
                   --  typecheck and evaluate
-                  let x = iType True 0 (oldValueContext, oldTypeContext) term in
+                  let x = iType False 0 (oldValueContext, oldTypeContext) term in
                   case x of
                     -- error, do not update the state
                     Left error -> state
                     -- success, update the state, print the new result
                     Right y   ->
-                        let v = iEval True term (oldValueContext, [])
+                        let v = iEval False term (oldValueContext, [])
                         in (updateState (y, v))
 
 checkPure :: State Value Value -> ITerm
@@ -216,8 +215,8 @@ checkPure state@(out, ve, te) t k =
                 do
                   -- i: String, t: Type
                   --  typecheck and evaluate
-                  x <- iType True 0 (te, ve) t
-                  let v = iEval True t (ve, [])
+                  x <- iType False 0 (te, ve) t
+                  let v = iEval False t (ve, [])
                   return (k (x, v))
 
 -- checkAdd :: State Value Value -> String -> ITerm -> Either String (State Value Value)
