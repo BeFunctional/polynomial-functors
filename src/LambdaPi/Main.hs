@@ -122,12 +122,13 @@ lpve :: Ctx Value
 lpve =      [(Global "Zero", VZero),
              (Global "Succ", VLam (\ n -> VSucc n)),
              (Global "Nat", VNat),
-             (Global "natElim", cEval (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ([], [])),
+             (Global "natElim", cEval False (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ([], [])),
              (Global "Type", VStar),
              (Global "Poly", VPoly), -- The value for the type Poly
              (Global "MkPoly", VLam (\ty -> VLam (\fy -> VMkPoly ty fy))), -- poly constructor
              (Global "polyElim",
-               cEval (Lam $ Lam $ Lam $ Inf $
+               cEval False
+                     (Lam $ Lam $ Lam $ Inf $
                       PolyElim (Inf (Bound 2))
                                (Inf (Bound 1))
                                (Inf (Bound 0))
@@ -137,7 +138,7 @@ lpve =      [(Global "Zero", VZero),
                                      (\b -> VLam
                                      (\v1 -> VLam
                                      (\v2 -> VComma a b v1 v2))))),
-             (Global "sigElim", cEval (Lam $ Lam $ Lam $ Lam $ Lam $
+             (Global "sigElim", cEval False (Lam $ Lam $ Lam $ Lam $ Lam $
                  Inf (SigElim (Inf (Bound 4))
                               (Inf (Bound 3))
                               (Inf (Bound 2))
@@ -148,7 +149,7 @@ lpve =      [(Global "Zero", VZero),
              (Global "Bool", VBool),
              (Global "True", VTrue),
              (Global "False", VFalse),
-             (Global "if", cEval (Lam $ Lam $ Lam $ Lam $
+             (Global "if", cEval False (Lam $ Lam $ Lam $ Lam $
                  Inf (If (Inf (Bound 3))
                          (Inf (Bound 2))
                          (Inf (Bound 1))
@@ -158,14 +159,14 @@ lpve =      [(Global "Zero", VZero),
              (Global "Cons", VLam (\ a -> VLam (\ n -> VLam (\ x -> VLam (\ xs ->
                              VCons a n x xs))))),
              (Global "Vec", VLam (\ a -> VLam (\ n -> VVec a n))),
-             (Global "vecElim", cEval (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
+             (Global "vecElim", cEval False (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
              (Global "Refl", VLam (\ a -> VLam (\ x -> VRefl a x))),
              (Global "Eq", VLam (\ a -> VLam (\ x -> VLam (\ y -> VEq a x y)))),
-             (Global "eqElim", cEval (Lam (Lam (Lam (Lam (Lam (Lam (Inf (EqElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
+             (Global "eqElim", cEval False (Lam (Lam (Lam (Lam (Lam (Lam (Inf (EqElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
              (Global "FZero", VLam (\ n -> VFZero n)),
              (Global "FSucc", VLam (\ n -> VLam (\ f -> VFSucc n f))),
              (Global "Fin", VLam (\ n -> VFin n)),
-             (Global "finElim", cEval (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) ([],[]))]
+             (Global "finElim", cEval False (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) ([],[]))]
 
 
 lpassume state@(out, ve, te) x t =
@@ -181,11 +182,11 @@ printTypeContext = unlines . fmap (\(Global nm, vl) -> nm ++ ":= " ++ show (cPri
 lp :: Interpreter ITerm CTerm Value Value CTerm Value
 lp = I { iname = "lambda-Pi",
          iprompt = "LP> ",
-         iitype = \ v c i -> let result = iType 0 (v, c) i
+         iitype = \ v c i -> let result = iType True 0 (v, c) i
                              in trace ("term: " ++ (show $ iPrint 0 0 i)
                                  ++ "\nresult: " ++ show (fmap (cPrint 0 0 . quote0) result)) result ,
          iquote = quote0,
-         ieval = \ e x -> trace ("value: " ++ show (iPrint 0 0 x) ++ "\n-----------")  (iEval x (e, [])),
+         ieval = \ e x -> trace ("value: " ++ show (iPrint 0 0 x) ++ "\n-----------")  (iEval True x (e, [])),
          ihastype = id,
          icprint = cPrint 0 0,
          itprint = cPrint 0 0 . quote0,
@@ -199,13 +200,13 @@ checkSimple :: State Value Value
             -> (State Value Value)
 checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
                   --  typecheck and evaluate
-                  let x = iType 0 (oldValueContext, oldTypeContext) term in
+                  let x = iType True 0 (oldValueContext, oldTypeContext) term in
                   case x of
                     -- error, do not update the state
                     Left error -> state
                     -- success, update the state, print the new result
                     Right y   ->
-                        let v = iEval term (oldValueContext, [])
+                        let v = iEval True term (oldValueContext, [])
                         in (updateState (y, v))
 
 checkPure :: State Value Value -> ITerm
@@ -215,8 +216,8 @@ checkPure state@(out, ve, te) t k =
                 do
                   -- i: String, t: Type
                   --  typecheck and evaluate
-                  x <- iType 0 (te, ve) t
-                  let v = iEval t (ve, [])
+                  x <- iType True 0 (te, ve) t
+                  let v = iEval True t (ve, [])
                   return (k (x, v))
 
 -- checkAdd :: State Value Value -> String -> ITerm -> Either String (State Value Value)

@@ -19,6 +19,7 @@ library
         LambdaPi.Parser
         LambdaPi.Printer
         LambdaPi.Quote
+        Debug.Utils
   build-depends:
       base >=4.9.1.0
     , mtl >=2.2.1

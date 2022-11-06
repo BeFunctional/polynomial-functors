@@ -192,7 +192,6 @@ check int showt state@(out, ve, te) i t k =
                 do
                   -- i: String, t: Type
                   --  typecheck and evaluate
-                  putStrLn "start check"
                   x <- iinfer int ve te t
                   case x of
                     Nothing  ->
@@ -200,9 +199,7 @@ check int showt state@(out, ve, te) i t k =
                         return state
                     Just y   ->
                       do
-                        putStrLn "start eval"
                         let v = ieval int ve t
-                        putStrLn "end eval"
                         return (k (y, v))
 
 

@@ -12,29 +12,29 @@ quote0 = quote 0
 quote :: Int -> Value -> CTerm
 quote ii (VLam t)           = Lam (quote (ii + 1) (t (vfree (Quote ii))))
 quote ii VStar              = Inf Star
-quote ii (VPi v f)          =  Inf (Pi (quote ii v)
-                                           (quote (ii + 1) (f (vfree (Quote ii)))))
+quote ii (VPi v f)          = Inf (Pi (quote ii v)
+                                      (quote (ii + 1) (f (vfree (Quote ii)))))
 quote ii (VNeutral n)       = Inf (neutralQuote ii n)
 quote ii VNat               = Inf Nat
 quote ii VZero              = Zero
 quote ii (VSucc n)          = Succ (quote ii n)
 quote ii (VSigma x f)       = Inf (Sigma (quote ii x) (quote ii f))
 quote ii (VComma ty sy x f) = Comma (quote ii ty) (quote ii sy)
-                                       (quote ii x) (quote ii f)
+                                    (quote ii x) (quote ii f)
 quote ii VPoly              = Inf Poly
 quote ii (VMkPoly s p)      = MkPoly (quote ii s) (quote ii p)
 quote ii (VVec a n)         = Inf (Vec (quote ii a) (quote ii n))
 quote ii (VNil a)           = Nil (quote ii a)
 quote ii (VCons a n x xs)   = Cons  (quote ii a) (quote ii n)
-                                       (quote ii x) (quote ii xs)
+                                    (quote ii x) (quote ii xs)
 quote ii (VEq a x y)        = Inf (Eq (quote ii a) (quote ii x) (quote ii y))
 quote ii (VRefl a x)        = Refl (quote ii a) (quote ii x)
 quote ii (VFin n)           = Inf (Fin (quote ii n))
 quote ii (VFZero n)         = FZero (quote ii n)
-quote ii (VFSucc n f)       = FSucc  (quote ii n) (quote ii f)
-quote ii VBool               = Inf IBool
-quote ii VTrue               = CTrue
-quote ii VFalse              = CFalse
+quote ii (VFSucc n f)       = FSucc (quote ii n) (quote ii f)
+quote ii VBool              = Inf IBool
+quote ii VTrue              = CTrue
+quote ii VFalse             = CFalse
 
 neutralQuote :: Int -> Neutral -> ITerm
 neutralQuote ii (NFree v)
