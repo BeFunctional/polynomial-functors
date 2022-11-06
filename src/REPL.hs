@@ -167,41 +167,42 @@ handleStmt :: Interpreter i c v t tinf inf
 handleStmt int state@(out, ve, te) stmt =
     case stmt of
         Assume ass -> foldM (iassume int) state ass
-        Let x e    -> checkEval x e
+        Let x e    -> trace "let" (checkEval x e)
         Eval e     -> checkEval it e
-        PutStrLn x -> (putStrLn x >> return state)
-        Out f      -> (return (f, ve, te))
+        PutStrLn x -> putStrLn x >> return state
+        Out f      -> return (f, ve, te)
   where
     --  checkEval :: String -> i -> IO (State v inf)
     checkEval i t =
-      trace "checkEval" $ check int state i t
-        (\ (y, v) -> do
-                       --  ugly, but we have limited space in the paper
-                       --  usually, you'd want to have the bound identifier *and*
-                       --  the result of evaluation
-                       let outtext = if i == it then render (icprint int (iquote int v) <> text " :: " <> itprint int y)
-                                                else render (text i <> text " :: " <> itprint int y)
-                       putStrLn outtext
-                       unless (null out) (writeFile out (process outtext)))
+      trace "checkEval" $ check int (show . itprint int) state i t
+        -- (\ (y, v) -> do
+        --                --  ugly, but we have limited space in the paper
+        --                --  usually, you'd want to have the bound identifier *and*
+        --                --  the result of evaluation
+        --                let outtext = if i == it then render (icprint int (iquote int v) <> text " :: " <> itprint int y)
+        --                                         else render (text i <> text " :: " <> itprint int y)
+        --                putStrLn outtext
+        --                unless (null out) (writeFile out (process outtext)))
         (\ (y, v) -> ("", (Global i, v) : ve, (Global i, ihastype int y) : te))
 
 
-check :: Interpreter i c v t tinf inf -> State v inf -> String -> i
-         -> ((t, v) -> IO ()) -> ((t, v) -> State v inf) -> IO (State v inf)
-check int state@(out, ve, te) i t kp k =
+check :: Interpreter i c v t tinf inf -> (t -> String) -> State v inf -> String -> i
+         ->  ((t, v) -> State v inf) -> IO (State v inf)
+check int showt state@(out, ve, te) i t k =
                 do
                   -- i: String, t: Type
                   --  typecheck and evaluate
+                  putStrLn "start check"
                   x <- iinfer int ve te t
                   case x of
                     Nothing  ->
                       do
-                        --  putStrLn "type error"
                         return state
                     Just y   ->
                       do
+                        putStrLn "start eval"
                         let v = ieval int ve t
-                        kp (y, v)
+                        putStrLn "end eval"
                         return (k (y, v))
 
 

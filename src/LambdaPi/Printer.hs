@@ -28,13 +28,15 @@ iPrint p ii (FinElim m mz ms n f)
                              =  iPrint p ii (Free (Global "finElim") :$: m :$: mz :$: ms :$: n :$: f)
 iPrint p ii (PolyElim x y z) =  iPrint p ii (Free (Global "polyElim") :$: x :$: y :$: z)
 iPrint p ii (Sigma (Inf IBool) b@(Lam (Inf (If motive thn els (Inf (Bound 0))))))  =
-  if isConst 0 motive
-  then text "Either" <+> cPrint p (ii + 1) thn <+> cPrint p (ii + 1) els
-  else iPrint p ii (Free (Global "Sigma") :$: (Inf IBool) :$: b)
+  -- if isConst 0 motive
+  -- then text "Either" <+> cPrint p (ii + 1) thn <+> cPrint p (ii + 1) els
+  -- else
+  iPrint p ii (Free (Global "Sigma") :$: (Inf IBool) :$: b)
 iPrint p ii (Sigma x y)      =
-  if isConst 0 y
-  then lparen <> cPrint p ii x <> comma <+> cPrint p ii y <> rparen
-  else iPrint p ii (Free (Global "Sigma") :$: x :$: y)
+  -- if isConst 0 y
+  -- then lparen <> cPrint p ii x <> comma <+> cPrint p ii y <> rparen
+  -- else
+  iPrint p ii (Free (Global "Sigma") :$: x :$: y)
 iPrint p ii (SigElim c y m f v)
                              =  if (isConst 0 f) && (isConst 1 f) -- if the return does not use its arguments
                                 then cPrint p ii f
