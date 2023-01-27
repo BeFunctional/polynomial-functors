@@ -175,10 +175,14 @@ lpassume state@(out, ve, te) x t =
         (\ (y, v) -> return ()) --  putStrLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 v))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
 printNameContext :: NameEnv Value -> String
-printNameContext = unlines . fmap (\(Global nm, ty) -> nm ++ ": " ++ show (cPrint 0 0 (quote0 ty)))
+printNameContext = unlines . fmap (\case
+  (Global nm, ty) -> nm ++ ": " ++ show (cPrint 0 0 (quote0 ty))
+  _ -> error "should not happen")
 
 printTypeContext :: Ctx Value -> String
-printTypeContext = unlines . fmap (\(Global nm, vl) -> nm ++ ":= " ++ show (cPrint 0 0 (quote0 vl)))
+printTypeContext = unlines . fmap (\case
+  (Global nm, vl) -> nm ++ ":= " ++ show (cPrint 0 0 (quote0 vl))
+  _ -> error "should not happen")
 
 lp :: Interpreter ITerm CTerm Value Value CTerm Value
 lp = I { iname = "lambda-Pi",

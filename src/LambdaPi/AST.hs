@@ -16,6 +16,7 @@ data CTerm
    |  Comma CTerm CTerm CTerm CTerm -- constructor for Sigma
    |  CTrue
    |  CFalse
+   |  Custom Text
   deriving (Show, Eq)
 
 data ITerm

@@ -19,6 +19,7 @@ type NameEnv v = [(Name, v)]
 
 data Stmt i tinf = Let String i           --  let x = t
                  | Assume [(String,tinf)] --  assume x :: t, assume x :: *
+                 | Data String [String]   --  declare a new enum
                  | Eval i
                  | PutStrLn String        --  lhs2TeX hacking, allow to print "magic" string
                  | Out String             --  more lhs2TeX hacking, allow to print to files

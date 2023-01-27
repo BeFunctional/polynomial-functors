@@ -162,6 +162,24 @@ iinfer int d g t =
     Left e -> putStrLn e >> return Nothing
     Right v -> return (Just v)
 
+addData :: String -> [String] -> State v inf -> State v inf
+addData name constuctors (x, ve, te) =
+  let tyConstructor = undefined
+      valueConstructors = undefined
+      eliminator = undefined
+      allConstructors = foldl1 (.)
+          (fmap (\(conName, conFun) -> addToContext conName conFun)
+                (zip constuctors valueConstructors))
+      addToTypeContext = addToContext name tyConstructor
+                       . addToContext (name ++ "Elim") undefined
+      addToValueContext = addToContext (name ++ "Elim") eliminator
+                        . allConstructors
+  in (x, addToValueContext ve, addToTypeContext te)
+  where
+
+    addToContext :: String -> inf -> Ctx inf -> Ctx inf
+    addToContext name term = ((Global name, term) :)
+
 handleStmt :: Interpreter i c v t tinf inf
            -> State v inf -> Stmt i tinf -> IO (State v inf)
 handleStmt int state@(out, ve, te) stmt =
@@ -171,6 +189,7 @@ handleStmt int state@(out, ve, te) stmt =
         Eval e     -> checkEval it e
         PutStrLn x -> putStrLn x >> return state
         Out f      -> return (f, ve, te)
+        Data nm cn -> pure $ addData nm cn state
   where
     --  checkEval :: String -> i -> IO (State v inf)
     checkEval i t =
