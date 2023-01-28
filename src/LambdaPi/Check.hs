@@ -1,9 +1,10 @@
 module LambdaPi.Check where
 
-import Control.Monad.Except
+import Text.PrettyPrint.HughesPJ hiding (parens, (<>), render)
 
-import Text.PrettyPrint.HughesPJ hiding (parens)
+import Control.Monad.Except (throwError, unless)
 
+import Data.Text (Text)
 import Common
 import LambdaPi.AST
 import LambdaPi.Eval
@@ -32,17 +33,17 @@ iType shouldTrace ii g (Pi tyt tyt')
                   (cSubst 0 (Free (Local ii)) tyt') VStar
         return VStar
 iType shouldTrace ii g (Free x)
-  = traceIf shouldTrace ("iType free: '" ++ show x ++ "'") $
+  = traceIf shouldTrace ("iType free: '" <> show x <> "'") $
         case lookup x (snd g) of
           Just ty        ->  return ty
-          Nothing        ->  throwError ("unknown identifier: " ++ render (iPrint 0 0 (Free x)))
+          Nothing        ->  throwError ("unknown identifier: " <> render (iPrint 0 0 (Free x)))
 iType shouldTrace ii g (e1 :$: e2)
-  = traceIf shouldTrace ("iType app '" ++ show (iPrint 0 0 e1) ++ "' applied to '" ++ show (cPrint 0 0 e2) ++ "'") $
+  = traceIf shouldTrace ("iType app '" <> show (iPrint 0 0 e1) <> "' applied to '" <> show (cPrint 0 0 e2) <> "'") $
         do  si <- iType shouldTrace ii g e1
             case si of
               VPi  ty ty1 -> do cType shouldTrace ii g e2 ty
                                 return ( ty1 (cEval shouldTrace e2 (fst g, [])))
-              _           -> throwError $ "illegal application : " ++ show e2 ++ "applyed to " ++ show e1
+              _           -> throwError $ "illegal application : " <> tshow e2 <> "applyed to " <> tshow e1
 iType shouldTrace ii g Nat                  = traceIf shouldTrace "iType Nat" $ return VStar
 iType shouldTrace ii g (NatElim m mz ms n)
   = traceIf shouldTrace "iType NatElim" $
@@ -155,7 +156,7 @@ iType shouldTrace ii g (FinElim m mz ms n f)
     cType shouldTrace ii g f (VFin nVal)
     let fVal = cEval shouldTrace f (fst g, [])
     return (mVal `vapp` nVal `vapp` fVal)
-iType shouldTrace _ _ tm = throwError $ "No type match for " ++ render (iPrint 0 0 tm)
+iType shouldTrace _ _ tm = throwError $ "No type match for " <> render (iPrint 0 0 tm)
 
 cType :: Bool -> Int -> (NameEnv Value,Context) -> CTerm -> Type -> Result ()
 cType shouldTrace ii g (Inf e) v
@@ -163,12 +164,12 @@ cType shouldTrace ii g (Inf e) v
     v' <- iType shouldTrace ii g e
     unless ( quote0 v == quote0 v')
            (throwError ("type mismatch:\n"
-                     ++ "type inferred:  "
-                     ++ render (cPrint 0 0 (quote0 v')) ++ "\n"
-                     ++ "type expected:  " ++ render (cPrint 0 0 (quote0 v)) ++ "\n"
-                     ++ "for expression: " ++ render (iPrint 0 0 e)))
+                     <> "type inferred:  "
+                     <> render (cPrint 0 0 (quote0 v')) <> "\n"
+                     <> "type expected:  " <> render (cPrint 0 0 (quote0 v)) <> "\n"
+                     <> "for expression: " <> render (iPrint 0 0 e)))
 cType shouldTrace ii g (Lam e) ( VPi ty ty')
-  = traceIf shouldTrace ("cType PI " ++ show (cPrint 0 0 (quote 0 ty)) ) $
+  = traceIf shouldTrace ("cType PI " <> show (cPrint 0 0 (quote 0 ty)) ) $
     cType shouldTrace  (ii + 1) ((\ (d,g) -> (d,  ((Local ii, ty ) : g))) g)
            (cSubst 0 (Free (Local ii)) e) ( ty' (vfree (Local ii)))
 cType shouldTrace ii g Zero      VNat  = traceIf shouldTrace "cType Zero" $ return ()
@@ -179,8 +180,8 @@ cType shouldTrace ii g (Comma ty sy x f) (VSigma ty' fy')
     let xVal = cEval shouldTrace x (fst g, [])
     unless (quote0 xVal == quote0 ty')
            (throwError $ "type mismatch:\n"
-                      ++ "given: " ++ render (cPrint 0 0 (quote0 xVal)) ++ "\n"
-                      ++ "expected: " ++ render (cPrint 0 0 (quote0 ty')) ++ "\n")
+                      <> "given: " <> render (cPrint 0 0 (quote0 xVal)) <> "\n"
+                      <> "expected: " <> render (cPrint 0 0 (quote0 ty')) <> "\n")
     cType shouldTrace ii g f fy'
 
 cType shouldTrace ii g (MkPoly x f) VPoly
@@ -230,9 +231,9 @@ cType shouldTrace ii g@(v,t) (FSucc n f') (VFin (VSucc mVal))
             (throwError "number mismatch FSucc")
     cType shouldTrace ii g f' (VFin mVal)
 cType shouldTrace ii g a v
-  = throwError $ "type mismatch - (unimplemented?) \n" ++
-                 "given: " ++ render (cPrint 0 0 (quote0 (cEval shouldTrace a (fst g, []))))
-             ++ " type expected: " ++ render (cPrint 0 0 (quote0 v)) ++ "\n"
+  = throwError $ "type mismatch - (unimplemented?) \n" <>
+                 "given: " <> render (cPrint 0 0 (quote0 (cEval shouldTrace a (fst g, []))))
+             <> " type expected: " <> render (cPrint 0 0 (quote0 v)) <> "\n"
 
 iSubst :: Int -> ITerm -> ITerm -> ITerm
 iSubst ii i' (Ann c c')     =  Ann (cSubst ii i' c) (cSubst ii i' c')

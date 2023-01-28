@@ -3,6 +3,10 @@ module LambdaPi.Main where
 import Common
 import REPL
 
+import Prelude hiding (unlines)
+
+import Data.Text (Text, unlines)
+
 import LambdaPi.AST
 import LambdaPi.Eval
 import LambdaPi.Check
@@ -171,14 +175,14 @@ lpve =      [(Global "Zero", VZero),
 
 lpassume state@(out, ve, te) x t =
   -- t: CTerm
-  check lp (show . cPrint 0 0 . quote0) state x (Ann t (Inf Star))
+  check lp (tshow . cPrint 0 0 . quote0) state x (Ann t (Inf Star))
         (\ (y, v) -> return ()) --  putStrLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 v))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
-printNameContext :: NameEnv Value -> String
-printNameContext = unlines . fmap (\(Global nm, ty) -> nm ++ ": " ++ show (cPrint 0 0 (quote0 ty)))
+printNameContext :: NameEnv Value -> Text
+printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPrint 0 0 (quote0 ty)))
 
-printTypeContext :: Ctx Value -> String
-printTypeContext = unlines . fmap (\(Global nm, vl) -> nm ++ ":= " ++ show (cPrint 0 0 (quote0 vl)))
+printTypeContext :: Ctx Value -> Text
+printTypeContext = unlines . fmap (\(Global nm, vl) -> nm <> ":= " <> tshow (cPrint 0 0 (quote0 vl)))
 
 lp :: Interpreter ITerm CTerm Value Value CTerm Value
 lp = I { iname = "lambda-Pi",
@@ -210,25 +214,25 @@ checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
 
 checkPure :: State Value Value -> ITerm
          -> ((Value, Value) -> State Value Value)
-         -> Either String (State Value Value)
+         -> Either Text (State Value Value)
 checkPure state@(out, ve, te) t k =
                 do
-                  -- i: String, t: Type
+                  -- i: Text, t: Type
                   --  typecheck and evaluate
                   x <- iType False 0 (te, ve) t
                   let v = iEval False t (ve, [])
                   return (k (x, v))
 
--- checkAdd :: State Value Value -> String -> ITerm -> Either String (State Value Value)
+-- checkAdd :: State Value Value -> Text -> ITerm -> Either Text (State Value Value)
 -- checkAdd state@(nm, valueCtx, typeCtx) identifier term =
 --   checkPure state term (\(newTy, newVal) -> (nm, (Global identifier, newVal) : valueCtx,
 --                                                  (Global identifier, newTy) : typeCtx))
 
 repLP :: IO ()
-repLP = readevalprint Nothing lp ([], lpve, lpte)
+repLP = readevalprint Nothing lp (mempty, lpve, lpte)
 
-runInteractive :: String -> IO ()
-runInteractive stdlib = readevalprint (Just stdlib) lp ([], lpve, lpte)
+runInteractive :: Text -> IO ()
+runInteractive stdlib = readevalprint (Just stdlib) lp (mempty, lpve, lpte)
 
 main :: IO ()
 main = repLP

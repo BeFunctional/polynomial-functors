@@ -1,7 +1,7 @@
 module LambdaPi.Printer where
 
 import Prelude hiding ((<>))
-import Text.PrettyPrint.HughesPJ hiding (parens)
+import Text.PrettyPrint.HughesPJ hiding (parens, text)
 
 import Common
 import LambdaPi.AST
@@ -46,7 +46,7 @@ iPrint p ii (If motive thn els arg)
                              = text "if" <+> cPrint p ii arg <+>
                                text "then" <+> cPrint p ii thn <+>
                                text "else" <+> cPrint p ii els
-iPrint p ii x                =  text ("[" ++ show x ++ "]")
+iPrint p ii x                = text "[" <> text (tshow x) <> text "]"
 
 cPrint :: Int -> Int -> CTerm -> Doc
 cPrint p ii (Inf i)      = iPrint p ii i
