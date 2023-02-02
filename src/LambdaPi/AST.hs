@@ -79,14 +79,15 @@ data Neutral
    |  NIf Value Value Value Neutral
 
 type Env = [Value]
-type Type     =  Value
-type Context    =  [(Name, Type)]
+type Type = Value
+type Context = [(Name, Type)]
 
 
 vapp :: Value -> Value -> Value
 vapp (VLam f)      v  =  f v
 vapp (VNeutral n)  v  =  VNeutral (NApp n v)
 vapp n v = error $ "tried to apply to something that is not a lambda nor a neutral term"
+
 
 vfree :: Name -> Value
 vfree n = VNeutral (NFree n)

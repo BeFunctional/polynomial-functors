@@ -1,3 +1,7 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module REPL where
 
 import Prelude hiding (print, writeFile, putStrLn, readFile, putStr, getLine, show)
@@ -19,33 +23,35 @@ import System.IO.Error
 
 import Common
 
-data Command = TypeOf Text
-             | Compile CompileForm
-             | Browse
-             | Quit
-             | Help
-             | Noop
+data Command
+   = TypeOf Text
+   | Compile CompileForm
+   | Browse
+   | Quit
+   | Help
+   | Noop
 
-data CompileForm = CompileInteractive  Text
-                 | CompileFile         Text
+data CompileForm
+   = CompileInteractive Text
+   | CompileFile        Text
 
 data InteractiveCommand = Cmd [Text] Text (Text -> Command) Text
 
 type Ctx inf = [(Name, inf)]
-type State v inf = (Text, NameEnv v, Ctx inf)
+type LangState v inf = (Text, NameEnv v, Ctx inf)
 
-data Interpreter i c v t tinf inf =
-  I { iname :: Text,
-      iprompt :: Text,
-      iitype :: NameEnv v -> Ctx inf -> i -> Result t,
-      iquote :: v -> c,
-      ieval  :: NameEnv v -> i -> v,
-      ihastype :: t -> inf,
-      icprint :: c -> Doc,
-      itprint :: t -> Doc,
-      iiparse :: Parsec Text () i,
-      isparse :: Parsec Text () (Stmt i tinf),
-      iassume :: State v inf -> (Text, tinf) -> IO (State v inf) }
+class Interpreter iterm cterm value where
+  iname    :: Text
+  iprompt  :: Text
+  iitype   :: NameEnv value -> Ctx value -> iterm -> Result value
+  iquote   :: value -> cterm
+  ieval    :: NameEnv value -> iterm -> value
+  ihastype :: value -> value
+  icprint  :: cterm -> Doc
+  itprint  :: value -> Doc
+  iiparse  :: Parsec Text () iterm
+  isparse  :: Parsec Text () (Stmt iterm cterm)
+  iassume  :: LangState value value -> (Text, cterm) -> IO (LangState value value)
 
 helpTxt :: [InteractiveCommand] -> Text
 helpTxt cs
@@ -104,32 +110,36 @@ parseIO filename parser content =
     Right r -> return (Just r)
 
 
-readevalprint :: Maybe Text -> Interpreter i c v t tinf inf -> State v inf -> IO ()
-readevalprint stdlib int state@(out, ve, te) =
-  let rec int state =
+readevalprint :: forall i c v. Interpreter i c v
+              => Maybe Text ->  LangState v v -> IO ()
+readevalprint stdlib state@(out, ve, te) =
+  let rec :: Interpreter i c v => LangState v v -> IO ()
+      rec state =
         do
-          putStr (iprompt int)
+          putStr (iprompt @i @c @v)
           hFlush stdout
           x <- catchIOError (fmap Just getLine) (\_ -> return Nothing)
           case x of
             Nothing   ->  return ()
             Just ""   ->
-              rec int state
+              rec state
             Just x    ->
               do
                 c  <- interpretCommand x
-                state' <- handleCommand int state c
-                maybe (return ()) (rec int) state'
+                state' <- handleCommand @i @c state c
+                maybe (return ()) rec state'
   in
     do
       --  welcome
-      putStrLn ("Interpreter for " <> iname int <> ".\n" <>
-                             "Type :? for help.")
+      putStrLn ("Interpreter for "
+             <> iname @i @c @v <> ".\n"
+             <> "Type :? for help.")
       case stdlib of
-           Nothing -> rec int state
+           Nothing -> rec state
            Just lib -> do
-             state' <- handleCommand int state (Compile $ CompileFile lib)
-             maybe (return ()) (rec int) state'
+             state' <- handleCommand @i @c state
+               (Compile $ CompileFile lib)
+             maybe (return ()) rec state'
 
 interpretCommand :: Text -> IO Command
 interpretCommand x
@@ -148,81 +158,99 @@ interpretCommand x
      else
        return (Compile (CompileInteractive x))
 
-handleCommand :: Interpreter i c v t tinf inf -> State v inf -> Command -> IO (Maybe (State v inf))
-handleCommand int state@(out, ve, te) cmd
+handleCommand :: forall i c v. Interpreter i c v
+              => LangState v v -> Command -> IO (Maybe (LangState v v))
+handleCommand state@(out, ve, te) cmd
   =  case cmd of
        Quit   ->  (putStrLn "!@#$^&*") >> return Nothing
        Noop   ->  return (Just state)
-       Help   ->  putStr (helpTxt commands) >> return (Just state)
+       Help   ->  putStr (helpTxt commands)
+              >> return (Just state)
        TypeOf x ->
-                  do  x <- parseIO "<interactive>" (iiparse int) x
-                      t <- maybe (return Nothing) (iinfer int ve te) x
-                      maybe (return ()) (\u -> putStrLn (render (itprint int u))) t
-                      return (Just state)
+         do  x <- parseIO "<interactive>" (iiparse @i @c @v) x
+             t <- maybe (return Nothing) (iinfer @i @c ve te) x
+             maybe (return ())
+                   (\u -> putStrLn (render (itprint @i @c u))) t
+             return (Just state)
        Browse ->  do  putStr (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
                       return (Just state)
        Compile c ->
-                  do  state <- case c of
-                                 CompileInteractive s -> compilePhrase int state s
-                                 CompileFile f        -> compileFile int state f
-                      return (Just state)
+         do state <- case c of
+              CompileInteractive s -> compilePhrase @i @c state s
+              CompileFile f        -> compileFile @i @c state f
+            return (Just state)
 
-compileFile :: Interpreter i c v t tinf inf -> State v inf -> Text -> IO (State v inf)
-compileFile int state@(out, ve, te) f =
+compileFile :: forall i c v. Interpreter i c v
+            => LangState v v -> Text -> IO (LangState v v)
+compileFile state@(out, ve, te) f =
   do
     x <- readFile (unpack f)
-    stmts <- parseIO f (many (isparse int)) x
-    maybe (return state) (foldM (handleStmt int) state) stmts
+    stmts <- parseIO f (many (isparse @i @c @v)) x
+    maybe (return state) (foldM (handleStmt @i @c) state) stmts
 
-compilePhrase :: Interpreter i c v t tinf inf -> State v inf -> Text -> IO (State v inf)
-compilePhrase int state@(out, ve, te) x =
+compilePhrase :: forall i c v. Interpreter i c v
+              => LangState v v -> Text -> IO (LangState v v)
+compilePhrase state@(out, ve, te) input =
   do
-    x <- parseIO "<interactive>" (isparse int) x
-    maybe (return state) (handleStmt int state) x
+    parsedInput <- parseIO "<interactive>" (isparse @i @c @v) input
+    maybe (return state) (handleStmt @i @c state) parsedInput
 
-
-iinfer int d g t =
-  case iitype int d g t of
+iinfer :: forall i c v. Interpreter i c v
+    => NameEnv v -> Ctx v -> i
+    -> IO (Maybe v)
+iinfer d g t =
+  case iitype @i @c d g t of
     Left e -> putStrLn e >> return Nothing
     Right v -> return (Just v)
 
-handleStmt :: Interpreter i c v t tinf inf
-           -> State v inf -> Stmt i tinf -> IO (State v inf)
-handleStmt int state@(out, ve, te) stmt =
+handleStmt :: forall i c v. Interpreter i c v
+           => LangState v v
+           -> Stmt i c
+           -> IO (LangState v v)
+handleStmt state@(out, ve, te) stmt =
     case stmt of
-        Assume ass -> foldM (iassume int) state ass
+        Assume ass -> foldM (iassume @i) state ass
         Let x e    -> checkEval x e
         Eval e     -> checkEval it e
         PutStrLn x -> putStrLn x >> return state
         Out f      -> return (f, ve, te)
   where
-    --  checkEval :: Text -> i -> IO (State v inf)
+    checkEval :: Interpreter i c v => Text -> i -> IO (LangState v v)
     checkEval i t =
-      check int (tshow . itprint int) state i t
+      check @i @c (tshow . itprint @i @c @v) state i t
         (\ (y, v) -> do
-                       --  ugly, but we have limited space in the paper
-                       --  usually, you'd want to have the bound identifier *and*
-                       --  the result of evaluation
-                       let outtext = if i == it then render (icprint int (iquote int v) PP.<> text " :: " PP.<> itprint int y)
-                                                else render (text i PP.<> text " :: " PP.<> itprint int y)
-                       putStrLn outtext
-                       unless (T.null out) (writeFile (unpack out) (process outtext)))
-        (\ (y, v) -> ("", (Global i, v) : ve, (Global i, ihastype int y) : te))
+          --  ugly, but we have limited space in the paper
+          --  usually, you'd want to have the bound identifier *and*
+          --  the result of evaluation
+          let outtext = if i == it
+              then render (icprint @i @c @v (iquote @i @c @v v) PP.<> text " :: " PP.<> itprint @i @c @v y)
+              else render (text i PP.<> text " :: " PP.<> itprint @i @c @v y)
+          putStrLn outtext
+          unless (T.null out) (writeFile (unpack out) (process outtext)))
+        (\ (y, v) -> ("",
+            (Global i, v) : ve,
+            (Global i, ihastype @i @c @v y) : te))
 
-check :: Interpreter i c v t tinf inf -> (t -> Text) -> State v inf -> Text -> i
-         -> ((t, v) -> IO ()) ->  ((t, v) -> State v inf) -> IO (State v inf)
-check int showt state@(out, ve, te) i t print k =
+check :: forall i c v. Interpreter i c v
+      => (v -> Text)
+      -> LangState v v
+      -> Text
+      -> i
+      -> ((v, v) -> IO ())
+      -> ((v, v) -> LangState v v)
+      -> IO (LangState v v)
+check showt state@(out, ve, te) i t print k =
                 do
                   -- i: Text, t: Type
                   --  typecheck and evaluate
-                  x <- iinfer int ve te t
+                  x <- iinfer @i @c @v ve te t
                   case x of
                     Nothing  ->
                       do
                         return state
                     Just y   ->
                       do
-                        let v = ieval int ve t
+                        let v = ieval @i @c @v ve t
                         print (y, v)
                         return (k (y, v))
 

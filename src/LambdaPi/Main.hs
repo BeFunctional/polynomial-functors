@@ -1,3 +1,6 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeApplications #-}
+
 module LambdaPi.Main where
 
 import Common
@@ -15,6 +18,8 @@ import LambdaPi.Parser
 import LambdaPi.Printer
 
 import Debug.Trace
+
+type PolyEngine = (Text, NameEnv Value, Ctx Value)
 
 lpte :: Ctx Value
 lpte =      [(Global "Zero", VNat),
@@ -175,7 +180,7 @@ lpve =      [(Global "Zero", VZero),
 
 lpassume state@(out, ve, te) x t =
   -- t: CTerm
-  check lp (tshow . cPrint 0 0 . quote0) state x (Ann t (Inf Star))
+  check @ITerm @CTerm @Value (tshow . cPrint 0 0 . quote0) state x (Ann t (Inf Star))
         (\ (y, v) -> return ()) --  putStrLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 v))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
 printNameContext :: NameEnv Value -> Text
@@ -184,23 +189,23 @@ printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPri
 printTypeContext :: Ctx Value -> Text
 printTypeContext = unlines . fmap (\(Global nm, vl) -> nm <> ":= " <> tshow (cPrint 0 0 (quote0 vl)))
 
-lp :: Interpreter ITerm CTerm Value Value CTerm Value
-lp = I { iname = "lambda-Pi",
-         iprompt = "LP> ",
-         iitype = \ v c i -> iType False 0 (v, c) i,
-         iquote = quote0,
-         ieval = \ e x -> iEval False x (e, []),
-         ihastype = id,
-         icprint = cPrint 0 0,
-         itprint = cPrint 0 0 . quote0,
-         iiparse = parseITerm 0 [],
-         isparse = parseStmt [],
-         iassume = \ s (x, t) -> lpassume s x t }
+instance Interpreter ITerm CTerm Value where
+  iname = "lambda-Pi"
+  iprompt = "LP> "
+  iitype = \ v c i -> iType False 0 (v, c) i
+  iquote = quote0
+  ieval = \ e x -> iEval False x (e, [])
+  ihastype = id
+  icprint = cPrint 0 0
+  itprint = cPrint 0 0 . quote0
+  iiparse = parseITerm 0 []
+  isparse = parseStmt []
+  iassume = \ s (x, t) -> lpassume s x t
 
-checkSimple :: State Value Value
+checkSimple :: PolyEngine
             -> ITerm
-            -> ((Value, Value) -> State Value Value)
-            -> (State Value Value)
+            -> ((Value, Value) -> PolyEngine)
+            -> PolyEngine
 checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
                   --  typecheck and evaluate
                   let x = iType False 0 (oldValueContext, oldTypeContext) term in
@@ -212,9 +217,9 @@ checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
                         let v = iEval False term (oldValueContext, [])
                         in (updateState (y, v))
 
-checkPure :: State Value Value -> ITerm
-         -> ((Value, Value) -> State Value Value)
-         -> Either Text (State Value Value)
+checkPure :: PolyEngine -> ITerm
+         -> ((Value, Value) -> PolyEngine)
+         -> Either Text (PolyEngine)
 checkPure state@(out, ve, te) t k =
                 do
                   -- i: Text, t: Type
@@ -223,16 +228,16 @@ checkPure state@(out, ve, te) t k =
                   let v = iEval False t (ve, [])
                   return (k (x, v))
 
--- checkAdd :: State Value Value -> Text -> ITerm -> Either Text (State Value Value)
+-- checkAdd :: PolyEngine -> Text -> ITerm -> Either Text (PolyEngine)
 -- checkAdd state@(nm, valueCtx, typeCtx) identifier term =
 --   checkPure state term (\(newTy, newVal) -> (nm, (Global identifier, newVal) : valueCtx,
 --                                                  (Global identifier, newTy) : typeCtx))
 
 repLP :: IO ()
-repLP = readevalprint Nothing lp (mempty, lpve, lpte)
+repLP = readevalprint @ITerm @CTerm @Value Nothing (mempty, lpve, lpte)
 
 runInteractive :: Text -> IO ()
-runInteractive stdlib = readevalprint (Just stdlib) lp (mempty, lpve, lpte)
+runInteractive stdlib = readevalprint @ITerm @CTerm @Value (Just stdlib) (mempty, lpve, lpte)
 
 main :: IO ()
 main = repLP
