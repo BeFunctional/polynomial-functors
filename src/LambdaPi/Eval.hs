@@ -1,6 +1,6 @@
 module LambdaPi.Eval where
 
-import Common
+import LambdaPi.Common
 import LambdaPi.AST
 import LambdaPi.Quote
 import LambdaPi.Printer

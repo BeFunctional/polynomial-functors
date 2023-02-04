@@ -1,4 +1,4 @@
-module Common where
+module LambdaPi.Common where
 
 import Text.PrettyPrint.HughesPJ hiding (parens)
 import qualified Text.PrettyPrint.HughesPJ as PP

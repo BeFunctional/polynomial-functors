@@ -1,5 +1,7 @@
 module LambdaPi.Parser where
 
+import Prelude hiding (String)
+
 import Data.List as L
 import Data.Text as T (Text, pack)
 import Data.Functor.Identity (Identity)
@@ -9,7 +11,7 @@ import Text.Parsec (Parsec, try)
 import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec.Language
 
-import Common
+import LambdaPi.Common
 import LambdaPi.AST
 
 haskellP :: GenLanguageDef Text () Identity
@@ -42,6 +44,7 @@ parseLet e =  do
 
 stringLiteral' :: TextParser () Text
 stringLiteral' = fmap pack (stringLiteral lambdaPi)
+
 identifier' :: TextParser () Text
 identifier' = fmap pack (identifier lambdaPi)
 
@@ -146,7 +149,7 @@ parseCTerm p e =
 
 parseLam :: [Text] -> TextParser () CTerm
 parseLam e =
-      do reservedOp lambdaPi ("\\" :: String)
+      do reservedOp lambdaPi "\\"
          xs <- many1 identifier'
          reservedOp lambdaPi "->"
          t <- parseCTerm 0 (L.reverse xs ++ e)

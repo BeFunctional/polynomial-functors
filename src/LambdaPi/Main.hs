@@ -1,14 +1,28 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 
-module LambdaPi.Main where
+module Main where
 
-import Common
-import REPL
+import LambdaPi.Common
+import LambdaPi.REPL
 
-import Prelude hiding (unlines)
+import Prelude hiding (unlines, putStr)
 
 import Data.Text (Text, unlines)
+import Data.Text.IO (putStr)
+import Data.Coerce
+
+import Control.Monad.Writer.Class
+import Control.Monad.IO.Class
 
 import LambdaPi.AST
 import LambdaPi.Eval
@@ -77,15 +91,15 @@ lpte =      [(Global "Zero", VNat),
                             VPi a (\_ -> VPi (VVec a n) (\_ -> VVec a (VSucc n)))))),
              (Global "Vec", VPi VStar (\_ -> VPi VNat (\_ -> VStar))),
              (Global "vecElim", VPi VStar (\ a ->
-                               VPi (VPi VNat (\ n -> VPi (VVec a n) (\_ -> VStar))) (\ m ->
-                               VPi (m `vapp` VZero `vapp` (VNil a)) (\_ ->
-                               VPi (VPi VNat (\ n ->
+                                VPi (VPi VNat (\ n -> VPi (VVec a n) (\_ -> VStar))) (\ m ->
+                                VPi (m `vapp` VZero `vapp` (VNil a)) (\_ ->
+                                VPi (VPi VNat (\ n ->
                                      VPi a (\ x ->
                                      VPi (VVec a n) (\ xs ->
                                      VPi (m `vapp` n `vapp` xs) (\_ ->
                                      m `vapp` VSucc n `vapp` VCons a n x xs))))) (\_ ->
-                               VPi VNat (\ n ->
-                               VPi (VVec a n) (\ xs -> m `vapp` n `vapp` xs))))))),
+                                VPi VNat (\ n ->
+                                VPi (VVec a n) (\ xs -> m `vapp` n `vapp` xs))))))),
              ------------------------------------------------------
              -- Equality
              ------------------------------------------------------
@@ -121,7 +135,7 @@ lpte =      [(Global "Zero", VNat),
                                 VPi (VPi VNat                  (\n ->
                                      VPi (VFin n)              (\f ->
                                      VPi (m `vapp` n `vapp` f) (\_ ->
-                                     m `vapp` (VSucc n) `vapp` (VFSucc n f))))) (\_ ->
+                                     m `vapp` VSucc n `vapp` VFSucc n f)))) (\_ ->
                                 VPi VNat (\ n -> VPi (VFin n) (\ f ->
                                 m `vapp` n `vapp` f))))))]
 
@@ -178,10 +192,13 @@ lpve =      [(Global "Zero", VZero),
              (Global "finElim", cEval False (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) ([],[]))]
 
 
+lpassume
+  :: MonadWriter Text m =>
+     (Text, NameEnv (MLTT' 'Val), Ctx (MLTT' 'Val))
+     -> Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
 lpassume state@(out, ve, te) x t =
-  -- t: CTerm
-  check @ITerm @CTerm @Value (tshow . cPrint 0 0 . quote0) state x (Ann t (Inf Star))
-        (\ (y, v) -> return ()) --  putStrLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 v))))
+  check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) state (coerce $ Ann t (Inf Star))
+        (\ (y, v) -> writeLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
 printNameContext :: NameEnv Value -> Text
 printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPrint 0 0 (quote0 ty)))
@@ -189,18 +206,25 @@ printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPri
 printTypeContext :: Ctx Value -> Text
 printTypeContext = unlines . fmap (\(Global nm, vl) -> nm <> ":= " <> tshow (cPrint 0 0 (quote0 vl)))
 
-instance Interpreter ITerm CTerm Value where
+type family MLTT (x :: LangTerm) :: *
+type instance MLTT Inferrable = ITerm
+type instance MLTT Checkable = CTerm
+type instance MLTT Val = Value
+
+newtype MLTT' (x :: LangTerm) = MLTT' (MLTT x)
+
+instance Interpreter MLTT' where
   iname = "lambda-Pi"
   iprompt = "LP> "
-  iitype = \ v c i -> iType False 0 (v, c) i
-  iquote = quote0
-  ieval = \ e x -> iEval False x (e, [])
+  iitype = \ v c i -> coerce (iType False 0 (coerce v, coerce c) (coerce i))
+  iquote = coerce . quote0 . coerce
+  ieval = \ e x -> coerce (iEval False (coerce x) (coerce e, []))
   ihastype = id
-  icprint = cPrint 0 0
-  itprint = cPrint 0 0 . quote0
-  iiparse = parseITerm 0 []
-  isparse = parseStmt []
-  iassume = \ s (x, t) -> lpassume s x t
+  icprint = cPrint 0 0 . coerce
+  itprint = cPrint 0 0 . quote0 . coerce
+  iiparse = fmap coerce (parseITerm 0 [])
+  isparse = fmap coerce (parseStmt [])
+  iassume = \ s (x, t) -> lpassume s x (coerce t)
 
 checkSimple :: PolyEngine
             -> ITerm
@@ -233,11 +257,22 @@ checkPure state@(out, ve, te) t k =
 --   checkPure state term (\(newTy, newVal) -> (nm, (Global identifier, newVal) : valueCtx,
 --                                                  (Global identifier, newTy) : typeCtx))
 
+newtype WriteIO a = WriteIO {getIO :: IO a}
+  deriving newtype (Functor, Applicative, Monad)
+
+instance MonadWriter Text WriteIO where
+  tell = WriteIO . putStr
+  listen = fmap (, "") -- technically we should get the last string passed to putStrLn
+  pass = fmap fst      -- technically we could implement this with an IORef
+
+instance MonadIO WriteIO where
+  liftIO = WriteIO
+
 repLP :: IO ()
-repLP = readevalprint @ITerm @CTerm @Value Nothing (mempty, lpve, lpte)
+repLP = getIO $ readevalprint @MLTT' Nothing (mempty, coerce lpve, coerce lpte)
 
 runInteractive :: Text -> IO ()
-runInteractive stdlib = readevalprint @ITerm @CTerm @Value (Just stdlib) (mempty, lpve, lpte)
+runInteractive stdlib = getIO $ readevalprint @MLTT' (Just stdlib) (mempty, coerce lpve, coerce lpte)
 
 main :: IO ()
 main = repLP

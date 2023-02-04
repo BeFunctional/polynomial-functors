@@ -1,6 +1,6 @@
 module LambdaPi.AST where
 
-import Common
+import LambdaPi.Common
 
 data CTerm
    =  Inf  ITerm
