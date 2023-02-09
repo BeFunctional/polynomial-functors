@@ -98,7 +98,7 @@ parseITerm 0 e =
   where
     rest t = do
         reserved lambdaPi "->"
-        t' <- parseCTerm 0 e
+        t' <- parseCTerm 0 (mempty : e)
         return (Pi t t')
 parseITerm 1 e =
   try
