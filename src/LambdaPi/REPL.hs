@@ -10,8 +10,11 @@ module LambdaPi.REPL where
 
 import Prelude hiding (print, writeFile, putStrLn, readFile, putStr, getLine, show)
 
+import Capability.State
+import Effect.Logger
+
 import Control.Monad.Except
-import Control.Monad.Writer.Class
+--import Control.Monad.Writer.Class
 
 import Data.List as LS
 import Data.Char
@@ -64,7 +67,7 @@ class Interpreter (c :: LangTerm -> *) where
   itprint  :: c Val -> Doc
   iiparse  :: Parsec Text () (c Inferrable)
   isparse  :: Parsec Text () (Stmt (c Inferrable) (c Checkable))
-  iassume  :: MonadWriter Text m => LangState (c Val) (c Val) -> (Text, (c Checkable)) -> m (LangState (c Val) (c Val))
+  iassume  :: Logger m => LangState (c Val) (c Val) -> (Text, (c Checkable)) -> m (LangState (c Val) (c Val))
 
 helpTxt :: [InteractiveCommand] -> Text
 helpTxt cs
@@ -116,47 +119,51 @@ parsePure filename parser content =
     Left err -> Left (tshow err)
     Right val -> Right val
 
-parseM :: MonadWriter Text m => Text -> Parsec Text () a -> Text -> m (Maybe a)
+parseM :: Logger m => Text -> Parsec Text () a -> Text -> m (Maybe a)
 parseM filename parser content =
   case parsePure filename parser content of
-    Left e  -> writeLn e >> return Nothing
+    Left e  -> logStr e >> return Nothing
     Right r -> return (Just r)
 
 
-readevalprint :: forall f m. MonadWriter Text  m
+readevalprint :: forall f m. Logger  m
+              => HasState "poly" (LangState (f Val) (f Val)) m
               => MonadIO m
               => Interpreter f
-              => Maybe Text ->  LangState (f Val) (f Val) -> m ()
-readevalprint stdlib state@(out, ve, te) =
-  let rec :: LangState (f Val) (f Val) -> m ()
-      rec state =
+              => Maybe Text -> m ()
+readevalprint stdlib =
+  let rec :: m ()
+      rec =
         do
-          write (iprompt @f)
+          state <- get @"poly"
+          logIn (iprompt @f)
           liftIO $ hFlush stdout
-          x <- liftIO $ catchIOError (fmap Just getLine) (\_ -> return Nothing)
+          x <- liftIO $ catchIOError (fmap Just getLine) (const $ return Nothing)
           case x of
-            Nothing   ->  return ()
-            Just ""   ->
-              rec state
-            Just x    ->
-              do
-                c  <- interpretCommand x
-                state' <- handleCommand state c
-                maybe (return ()) rec state'
+            Nothing -> return ()
+            Just "" -> rec
+            Just x  -> do
+                c <- interpretCommand x
+                state' <- handleCommand c
+                case state' of
+                  Abort -> return ()
+                  Continue -> rec
   in
     do
       --  welcome
-      writeLn ("Interpreter for "
+      logStr ("Interpreter for "
              <> iname @f <> ".\n"
              <> "Type :? for help.")
       case stdlib of
-           Nothing -> rec state
+           Nothing -> rec
            Just lib -> do
-             state' <- handleCommand state
-               (Compile $ CompileFile lib)
-             maybe (return ()) rec state'
+             state <- get @"poly"
+             state' <- handleCommand (Compile $ CompileFile lib)
+             case state' of
+               Abort -> return ()
+               Continue -> rec
 
-interpretCommand :: MonadWriter Text m => Text -> m Command
+interpretCommand :: Logger m => Text -> m Command
 interpretCommand x
   =  if T.isPrefixOf ":" x then
        do  let  (cmd,t')  =  T.break isSpace x
@@ -164,84 +171,94 @@ interpretCommand x
            --  find matching commands
            let  matching  =  LS.filter (\ (Cmd cs _ _ _) -> LS.any (T.isPrefixOf cmd) cs) commands
            case matching of
-             []  ->  do  writeLn ("Unknown command `" <> cmd <> "'. Type :? for help.")
+             []  ->  do  logStr ("Unknown command `" <> cmd <> "'. Type :? for help.")
                          return Noop
              [Cmd _ _ f _]
                  ->  do  return (f t)
-             x   ->  do  writeLn ("Ambiguous command, could be " <> T.concat (LS.intersperse ", " [ LS.head cs | Cmd cs _ _ _ <- matching ]) <> ".")
+             x   ->  do  logStr ("Ambiguous command, could be " <> T.concat (LS.intersperse ", " [ LS.head cs | Cmd cs _ _ _ <- matching ]) <> ".")
                          return Noop
      else
        return (Compile (CompileInteractive x))
 
-writeLn :: MonadWriter Text m => Text -> m ()
-writeLn text = tell (text <> "\n")
+data Feedback = Continue | Abort
 
-write :: MonadWriter Text m => Text -> m ()
-write = tell
-
-handleCommand :: (MonadWriter Text m, MonadIO m) => Interpreter f
-              => LangState (f Val) (f Val) -> Command -> m (Maybe (LangState (f Val) (f Val)))
-handleCommand state@(out, ve, te) cmd
-  =  case cmd of
-       Quit   ->  (writeLn "!@#$^&*") >> return Nothing
-       Noop   ->  return (Just state)
-       Help   ->  write (helpTxt commands)
-              >> return (Just state)
+handleCommand :: forall f m. (Logger m, MonadIO m, HasState "poly" (LangState (f Val) (f Val)) m)
+              => Interpreter f
+              => Command -> m Feedback
+handleCommand cmd = do
+    (out, ve, te) <- get @"poly"
+    case cmd of
+       Quit   ->  (logStr "!@#$^&*") >> return Abort
+       Noop   ->  return Continue
+       Help   ->  logStr (helpTxt commands)
+              >> return Continue
        TypeOf x ->
          do  x <- parseM "<interactive>" iiparse x
              t <- maybe (return Nothing) (iinfer ve te) x
              maybe (return ())
-                   (\u -> writeLn (render (itprint u))) t
-             return (Just state)
-       Browse ->  do  write (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
-                      return (Just state)
-       Compile c ->
-         do state <- case c of
-              CompileInteractive s -> compilePhrase state s
-              CompileFile f        -> compileFile state f
-            return (Just state)
+                   (\u -> logStr (render (itprint u)))
+                   t
+             return Continue
+       Browse ->  do logIn (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
+                     return Continue
+       Compile c -> do
+            case c of
+              CompileInteractive s -> compilePhrase s
+              CompileFile f        -> compileFile f
+            return Continue
 
-compileFile :: (MonadWriter Text m, MonadIO m) => Interpreter f
-            => LangState (f Val) (f Val) -> Text -> m (LangState (f Val) (f Val))
-compileFile state@(out, ve, te) f =
+compileFile
+    :: Logger m
+    => HasState "poly" (LangState (f Val) (f Val)) m
+    => MonadIO m
+    => Interpreter f
+    => Text
+    -> m ()
+compileFile f =
   do
     x <- liftIO $ readFile (unpack f)
     stmts <- parseM f (many isparse) x
-    maybe (return state) (foldM handleStmt state) stmts
+    maybe (return ()) (mapM_ handleStmt) stmts
 
-compilePhrase :: MonadWriter Text m => MonadIO m => Interpreter f
-              => LangState (f Val) (f Val) -> Text -> m (LangState (f Val) (f Val))
-compilePhrase state@(out, ve, te) input =
-  do
+compilePhrase
+    :: Logger m
+    => HasState "poly" (LangState (f Val) (f Val)) m
+    => MonadIO m
+    => Interpreter f
+    => Text -> m ()
+compilePhrase input = do
     parsedInput <- parseM "<interactive>" isparse input
-    maybe (return state) (handleStmt state) parsedInput
+    maybe (return ()) handleStmt parsedInput
 
-iinfer :: MonadWriter Text m
+iinfer :: Logger m
     => Interpreter f
     => NameEnv (f Val) -> Ctx (f Val) -> (f Inferrable)
     -> m (Maybe (f Val))
 iinfer d g t =
   case iitype d g t of
-    Left e -> writeLn e >> return Nothing
+    Left e -> logStr e >> return Nothing
     Right v -> return (Just v)
 
-handleStmt :: forall f m. MonadWriter Text m
+handleStmt :: forall f m. Logger m
+           => HasState "poly" (LangState (f Val) (f Val)) m
            => MonadIO m
            => Interpreter f
-           => LangState (f Val) (f Val)
-           -> Stmt (f Inferrable) (f Checkable)
-           -> m (LangState (f Val) (f Val))
-handleStmt state@(out, ve, te) stmt =
+           => Stmt (f Inferrable) (f Checkable)
+           -> m ()
+handleStmt stmt = do
+    (out, ve, te) <- get @"poly"
     case stmt of
-        Assume ass -> foldM iassume state ass
-        Let x e    -> checkEval x e
-        Eval e     -> checkEval it e
-        PutStrLn x -> writeLn x >> return state
-        Out f      -> return (f, ve, te)
+        Assume ass -> foldM iassume (out, ve, te) ass >>= put @"poly"
+        Let x e    -> checkEval x e >>= put @"poly"
+        Eval e     -> checkEval it e >>= put @"poly"
+        PutStrLn x -> logStr x >> return ()
+        Out f      -> put @"poly" (f, ve, te)
   where
-    checkEval :: Text -> f Inferrable -> m (LangState (f Val) (f Val))
-    checkEval i t =
-      check (tshow . itprint) state t
+    checkEval :: Text -> f Inferrable ->
+        m (LangState (f Val) (f Val))
+    checkEval i t = do
+      (out, ve, te) <- get @"poly"
+      check (tshow . itprint) (out, ve, te) t
         (\ (y, v) -> do
           --  ugly, but we have limited space in the paper
           --  usually, you'd want to have the bound identifier *and*
@@ -249,13 +266,13 @@ handleStmt state@(out, ve, te) stmt =
           let outtext = if i == it
               then render (icprint (iquote v) PP.<> text " :: " PP.<> itprint y)
               else render (text i PP.<> text " :: " PP.<> itprint y)
-          writeLn outtext
+          logStr outtext
           unless (T.null out) (liftIO $ writeFile (unpack out) (process outtext)))
         (\ (y, v) -> ("",
             (Global i, v) : ve,
             (Global i, ihastype y) : te))
 
-check :: forall f m. MonadWriter Text m
+check :: forall f m. Logger m
       => Interpreter f
       -- how to print
       => (f Val -> Text)

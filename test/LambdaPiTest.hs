@@ -1,65 +1,148 @@
-{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module Main (main) where
 
-import Test.Tasty
-import Test.Tasty.HUnit
+import Capability.Sink
+import Capability.Source
+import Capability.State
+import Capability.Reader
 
-import REPL
-import Common
-import Control.Monad.State
+import Control.Monad.Reader (ReaderT(..))
+import qualified Control.Monad.Reader as R (ask)
 import Control.Monad.Writer
 import Control.Monad.Identity
 
 import Data.Text
+import Data.IORef
+import Data.Coerce
 
+import Effect.Logger
+
+import GHC.Generics
+
+import LambdaPi.REPL
+import LambdaPi.Common
 import LambdaPi.AST
-import LambdaPi.Main hiding (main)
+import LambdaPi.Quote
+import LambdaPi.Init hiding (main)
 
-newtype TestM a = TestM { runTest :: StateT PolyEngine (Writer [Text]) a }
-  deriving newtype (Functor, Applicative, Monad)
+import Test.Tasty
+import Test.Tasty.HUnit
+
+import Data.Coerce
+
+instance Eq Value where
+  a == b = quote0 a == quote0 b
+
+data TestCtx = TestCtx
+  { logCtx :: LogCtx
+  , poly :: IORef PolyState
+  } deriving Generic
+
+newtype TestM a = TestM (ReaderT TestCtx IO a)
+  deriving (Functor, Applicative, Monad, MonadIO)
+  deriving (HasSource "poly" PolyState, HasSink "poly" PolyState, HasState "poly" PolyState) via
+    ReaderIORef (Rename "poly"(Field "poly" ()
+    (MonadReader (ReaderT TestCtx IO))))
+  deriving Logger via
+    TheLoggerReader (Field "logger" "logCtx" (Field "logCtx" "logCtx" (MonadReader (ReaderT TestCtx IO))))
 
 -- the return type is the state of the compiler after running the series of commands in `TestM`
 -- `a` is the return type expected, usally Unit
 -- `PolyEngine` is the state of the context after running the commands
 -- `[Text]` is the list of logs emmited by the compiler. We use this to check what is the output
 -- of the repl for a normal user (as opposed to a test user).
-runTest' :: PolyEngine -> TestM a -> ((a, PolyEngine), [Text])
-runTest' st = runWriter . flip runStateT st . runTest
+runTest' :: PolyEngine -> TestM a -> IO (a, PolyEngine, [Text])
+runTest' st (TestM r) = do
+  logRef <- newIORef []
+  polyRef <- newIORef st
+  result <- runReaderT r (TestCtx (print2List logRef) (coerce polyRef))
+  finalLogs <- readIORef logRef
+  finalState <- readIORef polyRef
+  pure (result, finalState, finalLogs)
 
-runCommands :: [Stmt ITerm CTerm] -> TestM ()
-runCommands cmds = undefined
-
--- initialises the context with the standard library
-initPoly :: IO PolyEngine
-initPoly = undefined
-
-runRepl :: Text -> State PolyEngine ()
-runRepl input = undefined
 
 makeIdStmt :: Stmt ITerm CTerm
 makeIdStmt =
-  Let "id" (Ann (Inf (Pi (Inf Star) (Inf Star))) (Lam (Inf (Bound 0))))
+  Let "id" (Ann (Lam $ Lam (Inf (Bound 0)))
+           (Inf (Pi (Inf Star) (Inf $ Pi (Inf $ Bound 0) (Inf $ Bound 1)))))
 
-stringIdStmt :: Text
-stringIdStmt = "let id : forall a :: * . a -> a = \\_ -> \\x -> x"
+commandStr :: (MonadIO m, HasState "poly" PolyState m, Logger m)
+           => Text -> m ()
+commandStr cmd = do
+  parsedCommand <- interpretCommand cmd
+  result <- handleCommand @MLTT' parsedCommand
+  return ()
 
-isEq`
+-- check if the final state and the std output are the ones expected
+isEq :: TestM () -> (PolyState, [Text]) -> Assertion
+isEq op endState = do
+  (_, finalState, printed) <- runTest' (initialContext) op
+  (finalState, printed) @?= coerce endState
+
+-- check if the std output is the one expected
+eqOutput :: TestM () -> [Text] -> Assertion
+eqOutput op printedExpected = do
+  (_, _, printedActual) <- runTest' (initialContext) op
+  printedActual @?= printedExpected
 
 syntaxTests :: TestTree
-syntaxTests = testCase "add identity"
-  do
+syntaxTests = testGroup "syntax tests"
+  [ testCase "test identity" $
+    commandStr "let id = (\\y x -> x) :: forall (a :: Type). a -> a"
+    `eqOutput`
+    ["id :: forall (x :: *) (y :: x) . x"]
+  , testCase "test if true" $
+    commandStr "if (\\x -> Nat) 3 4 True"
+    `eqOutput`
+    ["3 :: Nat"]
+  , testCase "test if False" $
+    commandStr "if (\\x -> Nat) 3 4 False"
+    `eqOutput`
+    ["4 :: Nat"]
+  ]
 
-  `isEq`
-  ([], ["ok"])
+polyTest :: TestTree
+polyTest = testGroup "poly tests"
+  [
+  ]
 
+cmdTests :: TestTree
+cmdTests = testGroup "command tests" $
+  [ testCase "test Type Nat" $
+    void (handleCommand @MLTT' (TypeOf "Nat"))
+    `eqOutput`
+    ["*"]
+  , testCase "test browse" $
+    void (handleCommand @MLTT' Browse)
+    `eqOutput`
+    ["finElim\nFin\nFSucc\nFZero\nif\nFalse\nTrue\nBool\neqElim\nEq\nRefl\nvecElim\nVec\nCons\nNil\nsigElim\nMkSigma\nSigma\npolyElim\nMkPoly\nPoly\nType\nnatElim\nNat\nSucc\nZero\n"]
+  ]
 stmtTests :: TestTree
-stmtTests = undefined
+stmtTests = testGroup "statement tests" $
+  [ testCase "test let id" $
+    void (handleStmt @MLTT' (coerce makeIdStmt))
+    `eqOutput`
+    ["id :: forall (x :: *) (y :: x) . x"]
+  ]
 
 tests :: TestTree
 tests = testGroup "REPL tests"
   [ syntaxTests
   , stmtTests
+  , cmdTests
   ]
 
 main :: IO ()
