@@ -67,7 +67,7 @@ instance
       coerce (C.ask @"logger" >>= liftIO . ($ msg) . fst3 :: m ())
     logIn msg =
       coerce (C.ask @"logger" >>= liftIO . ($ msg) . snd3 :: m ())
-    logIn msg =
+    logErr msg =
       coerce (C.ask @"logger" >>= liftIO . ($ msg) . thd3 :: m ())
 --
 -- | Deriving @HasReader@ from @MonadReader@.

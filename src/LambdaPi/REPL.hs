@@ -122,7 +122,7 @@ parsePure filename parser content =
 parseM :: Logger m => Text -> Parsec Text () a -> Text -> m (Maybe a)
 parseM filename parser content =
   case parsePure filename parser content of
-    Left e  -> logStr e >> return Nothing
+    Left e  -> logErr e >> return Nothing
     Right r -> return (Just r)
 
 
@@ -236,7 +236,7 @@ iinfer :: Logger m
     -> m (Maybe (f Val))
 iinfer d g t =
   case iitype d g t of
-    Left e -> logStr e >> return Nothing
+    Left e -> logErr e >> return Nothing
     Right v -> return (Just v)
 
 handleStmt :: forall f m. Logger m
