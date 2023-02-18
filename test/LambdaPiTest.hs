@@ -14,89 +14,17 @@
 
 module Main (main) where
 
-import Capability.Sink
-import Capability.Source
-import Capability.State
-import Capability.Reader
+import Control.Monad (void)
 
-import Control.Monad.Reader (ReaderT(..))
-import qualified Control.Monad.Reader as R (ask)
-import Control.Monad.Writer
-import Control.Monad.Identity
+import Data.Coerce (coerce)
 
-import Data.Text
-import Data.IORef
-import Data.Coerce
-
-import Effect.Logger
-
-import GHC.Generics
-
-import LambdaPi.REPL
-import LambdaPi.Common
-import LambdaPi.AST
-import LambdaPi.Quote
+import LambdaPi.REPL (handleCommand, handleStmt, Command(..), CompileForm(..))
 import LambdaPi.Init hiding (main)
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Data.Coerce
-
-instance Eq Value where
-  a == b = quote0 a == quote0 b
-
-data TestCtx = TestCtx
-  { logCtx :: LogCtx
-  , poly :: IORef PolyState
-  } deriving Generic
-
-newtype TestM a = TestM (ReaderT TestCtx IO a)
-  deriving (Functor, Applicative, Monad, MonadIO)
-  deriving (HasSource "poly" PolyState, HasSink "poly" PolyState, HasState "poly" PolyState) via
-    ReaderIORef (Rename "poly"(Field "poly" ()
-    (MonadReader (ReaderT TestCtx IO))))
-  deriving Logger via
-    TheLoggerReader (Field "logger" "logCtx" (Field "logCtx" "logCtx" (MonadReader (ReaderT TestCtx IO))))
-
--- the return type is the state of the compiler after running the series of commands in `TestM`
--- `a` is the return type expected, usally Unit
--- `PolyEngine` is the state of the context after running the commands
--- `[Text]` is the list of logs emmited by the compiler. We use this to check what is the output
--- of the repl for a normal user (as opposed to a test user).
-runTest' :: PolyEngine -> TestM a -> IO (a, PolyEngine, [Text])
-runTest' st (TestM r) = do
-  logRef <- newIORef []
-  polyRef <- newIORef st
-  result <- runReaderT r (TestCtx (print2List logRef) (coerce polyRef))
-  finalLogs <- readIORef logRef
-  finalState <- readIORef polyRef
-  pure (result, finalState, finalLogs)
-
-
-makeIdStmt :: Stmt ITerm CTerm
-makeIdStmt =
-  Let "id" (Ann (Lam $ Lam (Inf (Bound 0)))
-           (Inf (Pi (Inf Star) (Inf $ Pi (Inf $ Bound 0) (Inf $ Bound 1)))))
-
-commandStr :: (MonadIO m, HasState "poly" PolyState m, Logger m)
-           => Text -> m ()
-commandStr cmd = do
-  parsedCommand <- interpretCommand cmd
-  result <- handleCommand @MLTT' parsedCommand
-  return ()
-
--- check if the final state and the std output are the ones expected
-isEq :: TestM () -> (PolyState, [Text]) -> Assertion
-isEq op endState = do
-  (_, finalState, printed) <- runTest' (initialContext) op
-  (finalState, printed) @?= coerce endState
-
--- check if the std output is the one expected
-eqOutput :: TestM () -> [Text] -> Assertion
-eqOutput op printedExpected = do
-  (_, _, printedActual) <- runTest' (initialContext) op
-  printedActual @?= printedExpected
+import Utils
 
 syntaxTests :: TestTree
 syntaxTests = testGroup "syntax tests"
@@ -118,9 +46,21 @@ syntaxTests = testGroup "syntax tests"
     ["Pair :: forall (x :: *) (y :: *) . *"]
   ]
 
-polyTest :: TestTree
-polyTest = testGroup "poly tests"
+polyTests :: TestTree
+polyTests = testGroup "poly tests"
   [
+  ]
+
+errorTests :: TestTree
+errorTests = testGroup "error tests"
+  [ testCase "unexpected nat application" $
+    commandStr "if (\\_ -> Nat) 3 2 1"
+    `eqErrOutput`
+    ["type mismatch:\n\
+     \type inferred:  Nat\n\
+     \type expected:  Bool\n\
+     \for expression: 1 :: Nat"
+    ]
   ]
 
 cmdTests :: TestTree
@@ -135,7 +75,7 @@ cmdTests = testGroup "command tests" $
     ["finElim\nFin\nFSucc\nFZero\nif\nFalse\nTrue\nBool\neqElim\nEq\nRefl\nvecElim\nVec\nCons\nNil\nsigElim\nMkSigma\nSigma\npolyElim\nMkPoly\nPoly\nType\nnatElim\nNat\nSucc\nZero\n"]
   , testCase "stdlib import" $
     void (handleCommand @MLTT' (Compile (CompileFile "stdlib.lp")))
-    `eqOutput`
+    `eqErrOutput`
     []
   ]
 
@@ -152,6 +92,8 @@ tests = testGroup "REPL tests"
   [ syntaxTests
   , stmtTests
   , cmdTests
+  , errorTests
+  , polyTests
   ]
 
 main :: IO ()
