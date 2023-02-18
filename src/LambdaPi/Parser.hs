@@ -20,7 +20,7 @@ haskellP = LanguageDef
          , commentEnd     = "-}"
          , commentLine    = "--"
          , nestedComments = True
-         , identStart     = letter
+         , identStart     = letter <|> char '_'
          , identLetter    = alphaNum <|> oneOf "_'"
          , opStart        = opLetter haskellP
          , opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"

@@ -100,18 +100,22 @@ eqOutput op printedExpected = do
 
 syntaxTests :: TestTree
 syntaxTests = testGroup "syntax tests"
-  [ testCase "test identity" $
+  [ testCase "identity" $
     commandStr "let id = (\\y x -> x) :: forall (a :: Type). a -> a"
     `eqOutput`
     ["id :: forall (x :: *) (y :: x) . x"]
-  , testCase "test if true" $
+  , testCase "if true" $
     commandStr "if (\\x -> Nat) 3 4 True"
     `eqOutput`
     ["3 :: Nat"]
-  , testCase "test if False" $
+  , testCase "if False" $
     commandStr "if (\\x -> Nat) 3 4 False"
     `eqOutput`
     ["4 :: Nat"]
+  , testCase "Decl Pair" $
+    commandStr "let Pair = (\\x y -> Sigma x (\\_ -> y)) :: forall (x :: Type) (y :: Type). Type"
+    `eqOutput`
+    ["Pair :: forall (x :: *) (y :: *) . *"]
   ]
 
 polyTest :: TestTree
@@ -121,15 +125,20 @@ polyTest = testGroup "poly tests"
 
 cmdTests :: TestTree
 cmdTests = testGroup "command tests" $
-  [ testCase "test Type Nat" $
+  [ testCase "Type Nat" $
     void (handleCommand @MLTT' (TypeOf "Nat"))
     `eqOutput`
     ["*"]
-  , testCase "test browse" $
+  , testCase "browse" $
     void (handleCommand @MLTT' Browse)
     `eqOutput`
     ["finElim\nFin\nFSucc\nFZero\nif\nFalse\nTrue\nBool\neqElim\nEq\nRefl\nvecElim\nVec\nCons\nNil\nsigElim\nMkSigma\nSigma\npolyElim\nMkPoly\nPoly\nType\nnatElim\nNat\nSucc\nZero\n"]
+  , testCase "stdlib import" $
+    void (handleCommand @MLTT' (Compile (CompileFile "stdlib.lp")))
+    `eqOutput`
+    []
   ]
+
 stmtTests :: TestTree
 stmtTests = testGroup "statement tests" $
   [ testCase "test let id" $
