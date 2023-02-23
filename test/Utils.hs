@@ -32,6 +32,7 @@ import LambdaPi.Init hiding (main)
 import LambdaPi.Quote
 import LambdaPi.REPL
 
+-- bespoke Eq instance for Values in tests
 instance Eq Value where
   a == b = quote0 a == quote0 b
 
@@ -52,7 +53,8 @@ newtype TestM a = TestM (ReaderT TestCtx IO a)
 -- `a` is the return type expected, usally Unit
 -- `PolyEngine` is the state of the context after running the commands
 -- `[Text]` is the list of logs emmited by the compiler. We use this to check what is the output
--- of the repl for a normal user (as opposed to a test user).
+-- of the repl for a normal user (as opposed to a test user). The second `[Text]` is the list
+-- log errors emmited by the compiler.
 runTest' :: PolyEngine -> TestM a -> IO (a, PolyEngine, [Text], [Text])
 runTest' st (TestM r) = do
   logRef <- newIORef []
@@ -64,12 +66,13 @@ runTest' st (TestM r) = do
   finalState <- readIORef polyRef
   pure (result, finalState, finalLogs, finalErrors)
 
-
+-- a simple statement written manually
 makeIdStmt :: Stmt ITerm CTerm
 makeIdStmt =
   Let "id" (Ann (Lam $ Lam (Inf (Bound 0)))
            (Inf (Pi (Inf Star) (Inf $ Pi (Inf $ Bound 0) (Inf $ Bound 1)))))
 
+-- compile a command given as a string
 commandStr :: (MonadIO m, HasState "poly" PolyState m, Logger m)
            => Text -> m ()
 commandStr cmd = do
@@ -89,6 +92,7 @@ eqOutput op printedExpected = do
   (_, _, printedActual, _) <- runTest' initialContext op
   printedActual @?= printedExpected
 
+-- check the error output is the one expected
 eqErrOutput :: TestM () -> [Text] -> Assertion
 eqErrOutput op expectedErrors = do
   (_, _, _, errors) <- runTest' initialContext op
