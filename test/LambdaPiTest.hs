@@ -20,6 +20,7 @@ import Data.Coerce (coerce)
 
 import LambdaPi.REPL (handleCommand, handleStmt, Command(..), CompileForm(..))
 import LambdaPi.Init hiding (main)
+import LambdaPi.Common (Stmt(..))
 
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -85,6 +86,10 @@ stmtTests = testGroup "statement tests" $
     void (handleStmt @MLTT' (coerce makeIdStmt))
     `eqOutput`
     ["id :: forall (x :: *) (y :: x) . x"]
+  , testCase "test data decl Bool" $
+    void (handleStmt @MLTT' (DataDecl "Bool" ["True", "False"]))
+    `eqOutput`
+    ["Bool = True | False"]
   ]
 
 tests :: TestTree

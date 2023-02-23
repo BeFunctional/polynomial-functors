@@ -24,6 +24,7 @@ data Stmt i tinf
    | Eval i
    | PutStrLn Text        --  lhs2TeX hacking, allow to print "magic" string
    | Out Text             --  more lhs2TeX hacking, allow to print to files
+   | DataDecl {name :: Text, constructors :: [Text] }
   deriving (Show)
 
 parensIf :: Bool -> Doc -> Doc

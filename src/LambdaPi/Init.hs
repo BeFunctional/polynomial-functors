@@ -207,8 +207,8 @@ lpve =      [(Global "Zero", VZero),
 
 lpassume
   :: Logger m =>
-     (Text, NameEnv (MLTT' 'Val), Ctx (MLTT' 'Val))
-     -> Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
+     (Text, NameEnv (MLTT' 'Val), Ctx (MLTT' 'Val)) ->
+     Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
 lpassume state@(out, ve, te) x t =
   check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) state (coerce $ Ann t (Inf Star))
         (\ (y, v) -> logStr (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))

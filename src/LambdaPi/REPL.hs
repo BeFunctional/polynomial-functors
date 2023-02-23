@@ -253,6 +253,7 @@ handleStmt stmt = do
         Eval e     -> checkEval it e >>= put @"poly"
         PutStrLn x -> logStr x >> return ()
         Out f      -> put @"poly" (f, ve, te)
+        DataDecl nm cs -> undefined
   where
     checkEval :: Text -> f Inferrable ->
         m (LangState (f Val) (f Val))
