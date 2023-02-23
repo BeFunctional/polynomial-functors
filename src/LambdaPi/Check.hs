@@ -5,7 +5,7 @@ import Text.PrettyPrint.HughesPJ hiding (parens, (<>), render)
 import Control.Monad.Except (throwError, unless)
 
 import Data.Text (Text)
-import Common
+import LambdaPi.Common
 import LambdaPi.AST
 import LambdaPi.Eval
 import LambdaPi.Quote

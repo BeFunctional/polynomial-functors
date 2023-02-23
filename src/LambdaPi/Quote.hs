@@ -1,6 +1,6 @@
 module LambdaPi.Quote where
 
-import Common
+import LambdaPi.Common
 import LambdaPi.AST
 
 instance Show Value where

@@ -1,11 +1,40 @@
-module LambdaPi.Main where
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
-import Common
-import REPL
+module LambdaPi.Init where
 
-import Prelude hiding (unlines)
+import LambdaPi.Common
+import LambdaPi.REPL
+
+import Prelude hiding (unlines, putStr)
 
 import Data.Text (Text, unlines)
+import Data.Text.IO (putStr)
+import Data.Coerce
+import Data.IORef
+
+import GHC.Generics
+
+import Capability.Error
+import Capability.Sink
+import Capability.Source
+import Capability.State
+import Capability.Reader
+
+import Control.Monad.Reader (ReaderT(..))
+import Control.Monad.Writer.Class
+import Control.Monad.IO.Class
 
 import LambdaPi.AST
 import LambdaPi.Eval
@@ -14,7 +43,10 @@ import LambdaPi.Quote
 import LambdaPi.Parser
 import LambdaPi.Printer
 
-import Debug.Trace
+import Effect.Logger
+
+type PolyEngine = LangState Value Value
+type PolyState = LangState (MLTT' Val) (MLTT' Val)
 
 lpte :: Ctx Value
 lpte =      [(Global "Zero", VNat),
@@ -72,15 +104,15 @@ lpte =      [(Global "Zero", VNat),
                             VPi a (\_ -> VPi (VVec a n) (\_ -> VVec a (VSucc n)))))),
              (Global "Vec", VPi VStar (\_ -> VPi VNat (\_ -> VStar))),
              (Global "vecElim", VPi VStar (\ a ->
-                               VPi (VPi VNat (\ n -> VPi (VVec a n) (\_ -> VStar))) (\ m ->
-                               VPi (m `vapp` VZero `vapp` (VNil a)) (\_ ->
-                               VPi (VPi VNat (\ n ->
+                                VPi (VPi VNat (\ n -> VPi (VVec a n) (\_ -> VStar))) (\ m ->
+                                VPi (m `vapp` VZero `vapp` (VNil a)) (\_ ->
+                                VPi (VPi VNat (\ n ->
                                      VPi a (\ x ->
                                      VPi (VVec a n) (\ xs ->
                                      VPi (m `vapp` n `vapp` xs) (\_ ->
                                      m `vapp` VSucc n `vapp` VCons a n x xs))))) (\_ ->
-                               VPi VNat (\ n ->
-                               VPi (VVec a n) (\ xs -> m `vapp` n `vapp` xs))))))),
+                                VPi VNat (\ n ->
+                                VPi (VVec a n) (\ xs -> m `vapp` n `vapp` xs))))))),
              ------------------------------------------------------
              -- Equality
              ------------------------------------------------------
@@ -116,7 +148,7 @@ lpte =      [(Global "Zero", VNat),
                                 VPi (VPi VNat                  (\n ->
                                      VPi (VFin n)              (\f ->
                                      VPi (m `vapp` n `vapp` f) (\_ ->
-                                     m `vapp` (VSucc n) `vapp` (VFSucc n f))))) (\_ ->
+                                     m `vapp` VSucc n `vapp` VFSucc n f)))) (\_ ->
                                 VPi VNat (\ n -> VPi (VFin n) (\ f ->
                                 m `vapp` n `vapp` f))))))]
 
@@ -173,10 +205,13 @@ lpve =      [(Global "Zero", VZero),
              (Global "finElim", cEval False (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) ([],[]))]
 
 
+lpassume
+  :: Logger m =>
+     (Text, NameEnv (MLTT' 'Val), Ctx (MLTT' 'Val))
+     -> Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
 lpassume state@(out, ve, te) x t =
-  -- t: CTerm
-  check lp (tshow . cPrint 0 0 . quote0) state x (Ann t (Inf Star))
-        (\ (y, v) -> return ()) --  putStrLn (render (text x <> text " :: " <> cPrint 0 0 (quote0 v))))
+  check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) state (coerce $ Ann t (Inf Star))
+        (\ (y, v) -> logStr (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
 printNameContext :: NameEnv Value -> Text
 printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPrint 0 0 (quote0 ty)))
@@ -184,55 +219,82 @@ printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPri
 printTypeContext :: Ctx Value -> Text
 printTypeContext = unlines . fmap (\(Global nm, vl) -> nm <> ":= " <> tshow (cPrint 0 0 (quote0 vl)))
 
-lp :: Interpreter ITerm CTerm Value Value CTerm Value
-lp = I { iname = "lambda-Pi",
-         iprompt = "LP> ",
-         iitype = \ v c i -> iType False 0 (v, c) i,
-         iquote = quote0,
-         ieval = \ e x -> iEval False x (e, []),
-         ihastype = id,
-         icprint = cPrint 0 0,
-         itprint = cPrint 0 0 . quote0,
-         iiparse = parseITerm 0 [],
-         isparse = parseStmt [],
-         iassume = \ s (x, t) -> lpassume s x t }
+type family MLTT (x :: LangTerm) :: *
+type instance MLTT Inferrable = ITerm
+type instance MLTT Checkable = CTerm
+type instance MLTT Val = Value
 
-checkSimple :: State Value Value
-            -> ITerm
-            -> ((Value, Value) -> State Value Value)
-            -> (State Value Value)
-checkSimple state@(out, oldValueContext, oldTypeContext) term updateState =
-                  --  typecheck and evaluate
-                  let x = iType False 0 (oldValueContext, oldTypeContext) term in
-                  case x of
-                    -- error, do not update the state
-                    Left error -> state
-                    -- success, update the state, print the new result
-                    Right y   ->
-                        let v = iEval False term (oldValueContext, [])
-                        in (updateState (y, v))
+newtype MLTT' (x :: LangTerm) = MLTT' (MLTT x)
 
-checkPure :: State Value Value -> ITerm
-         -> ((Value, Value) -> State Value Value)
-         -> Either Text (State Value Value)
-checkPure state@(out, ve, te) t k =
-                do
-                  -- i: Text, t: Type
-                  --  typecheck and evaluate
-                  x <- iType False 0 (te, ve) t
-                  let v = iEval False t (ve, [])
-                  return (k (x, v))
+instance Interpreter MLTT' where
+  iname = "lambda-Pi"
+  iprompt = "LP> "
+  iitype = \ v c i -> coerce (iType False 0 (coerce v, coerce c) (coerce i))
+  iquote = coerce . quote0 . coerce
+  ieval = \ e x -> coerce (iEval False (coerce x) (coerce e, []))
+  ihastype = id
+  icprint = cPrint 0 0 . coerce
+  itprint = cPrint 0 0 . quote0 . coerce
+  iiparse = fmap coerce (parseITerm 0 [])
+  isparse = fmap coerce (parseStmt [])
+  iassume = \ s (x, t) -> lpassume s x (coerce t)
 
--- checkAdd :: State Value Value -> Text -> ITerm -> Either Text (State Value Value)
--- checkAdd state@(nm, valueCtx, typeCtx) identifier term =
---   checkPure state term (\(newTy, newVal) -> (nm, (Global identifier, newVal) : valueCtx,
---                                                  (Global identifier, newTy) : typeCtx))
+checkSimple :: (HasState "poly" PolyEngine m)
+            => ITerm
+            -> ((Value, Value) -> PolyEngine)
+            -> m ()
+checkSimple term updateState = do
+  (out, oldValueContext, oldTypeContext) <- get @"poly"
+  --  typecheck and evaluate
+  let x = iType False 0 (coerce oldValueContext, coerce oldTypeContext) term
+  case x of
+    -- error, do not update the state
+    Left error -> pure ()
+    -- success, update the state, print the new result
+    Right y   ->
+        let v = iEval False term (coerce oldValueContext, [])
+        in put @"poly" (updateState (y, v))
+
+checkPure :: PolyEngine
+          -> ITerm
+          -> ((Value, Value) -> PolyEngine)
+          -> Either Text PolyEngine
+checkPure state@(out, ve, te) t k =do
+  -- i: Text, t: Type
+  --  typecheck and evaluate
+  x <- iType False 0 (coerce te, coerce ve) t
+  let v = iEval False t (coerce ve, [])
+  return (k (x, v))
+
+initialContext :: (Text, Ctx Value, Ctx Value)
+initialContext = (mempty, coerce lpve, coerce lpte)
+
+data LogAndStateCtx = LogAndStateCtx
+  { logCtx :: LogCtx
+  , poly :: IORef PolyState
+  } deriving Generic
+
+newtype MainM a = MainM (ReaderT LogAndStateCtx IO a)
+  deriving (Functor, Applicative, Monad, MonadIO)
+  deriving (HasSource "poly" PolyState
+           , HasSink "poly" PolyState
+           , HasState "poly" PolyState) via
+    ReaderIORef (Rename "poly"(Field "poly" ()
+      (MonadReader (ReaderT LogAndStateCtx IO))))
+  deriving Logger via
+    (TheLoggerReader
+      (Field "logger" "logCtx"
+        (Field "logCtx" ()
+          (MonadReader (ReaderT LogAndStateCtx IO)))))
+
+runMain :: PolyState -> MainM a -> IO a
+runMain init (MainM program) = do
+  st <- newIORef init
+  runReaderT program (LogAndStateCtx printStdOut st)
 
 repLP :: IO ()
-repLP = readevalprint Nothing lp (mempty, lpve, lpte)
+repLP = runMain (coerce initialContext) $ readevalprint @MLTT' Nothing
 
 runInteractive :: Text -> IO ()
-runInteractive stdlib = readevalprint (Just stdlib) lp (mempty, lpve, lpte)
+runInteractive stdlib = runMain (coerce initialContext) $ readevalprint @MLTT' (Just stdlib)
 
-main :: IO ()
-main = repLP

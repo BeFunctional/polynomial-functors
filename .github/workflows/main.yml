@@ -68,3 +68,27 @@ jobs:
 
       - run: nix-build --version
       - run: nix-build shell.nix --argstr compiler-nix-name ${{matrix.ghc}}
+
+  build-tests:
+    strategy:
+      matrix:
+        ghc: ["ghc865", "ghc884", "ghc8107", "ghc92"]
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - uses: cachix/install-nix-action@v16
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - uses: cachix/cachix-action@v10
+        with:
+          name: polynomial-functors
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
+      - run: nix-build --version
+      - run: nix-shell shell.nix --run "cabal test"

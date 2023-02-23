@@ -1,6 +1,6 @@
 module LambdaPi.Eval where
 
-import Common
+import LambdaPi.Common
 import LambdaPi.AST
 import LambdaPi.Quote
 import LambdaPi.Printer
@@ -29,14 +29,18 @@ cEval shouldTrace CFalse           d = traceIf shouldTrace "eval false" $ VFalse
 iEval :: Bool -> ITerm -> (NameEnv Value,Env) -> Value
 iEval shouldTrace (Ann c _)     d = traceIf shouldTrace "eval ann" $  cEval shouldTrace c d
 iEval shouldTrace Star          d = traceIf shouldTrace "eval star" $  VStar
-iEval shouldTrace (Pi ty ty1)   d = traceIf shouldTrace "eval pi" $  VPi (cEval shouldTrace ty d) (\ x -> cEval shouldTrace ty1 (((\(e, d) -> (e,  (x : d))) d)))
+iEval shouldTrace (Pi ty ty1)   d = traceIf shouldTrace "eval pi"
+                                  $ VPi (cEval shouldTrace ty d)
+                                        (\x -> cEval shouldTrace ty1 (((\(e, d) -> (e,  (x : d))) d)))
 iEval shouldTrace (Bound ii)    d = traceIf shouldTrace "eval bound" $  (snd d) !! ii
-iEval shouldTrace (Free x)      d = traceIf shouldTrace "eval free" $  case lookup x (fst d) of Nothing ->  (vfree x); Just v -> v
-iEval shouldTrace (i :$: c)     d = traceIf shouldTrace "eval app" $  vapp (iEval shouldTrace i d) (cEval shouldTrace c d)
-iEval shouldTrace Nat           d = traceIf shouldTrace "eval net" $  VNat
+iEval shouldTrace (Free x)      d = traceIf shouldTrace "eval free"
+                                  $ case lookup x (fst d) of Nothing ->  (vfree x); Just v -> v
+iEval shouldTrace (i :$: c)     d = traceIf shouldTrace "eval app"
+                                  $ vapp (iEval shouldTrace i d) (cEval shouldTrace c d)
+iEval shouldTrace Nat           d = traceIf shouldTrace "eval net" $ VNat
 iEval shouldTrace (NatElim m mz ms n) d
-  = traceIf shouldTrace "eval natElim" $
-    let  mzVal = cEval shouldTrace mz d
+  = traceIf shouldTrace "eval natElim"
+  $ let  mzVal = cEval shouldTrace mz d
          msVal = cEval shouldTrace ms d
          rec nVal =
            case nVal of
@@ -60,8 +64,11 @@ iEval shouldTrace (VecElim a m mn mc n xs) d =
                                             mnVal mcVal nVal n)
            _              ->  error "internal: eval vecElim"
   in   rec (cEval shouldTrace n d) (cEval shouldTrace xs d)
-iEval shouldTrace (Eq a x y)             d  = traceIf shouldTrace "eval eq" $ VEq (cEval shouldTrace a d) (cEval shouldTrace x d) (cEval shouldTrace y d)
-iEval shouldTrace (EqElim a m mr x y eq) d  = traceIf shouldTrace "eval eqelim" $ rec (cEval shouldTrace eq d)
+iEval shouldTrace (Eq a x y)             d
+  = traceIf shouldTrace "eval eq"
+  $ VEq (cEval shouldTrace a d) (cEval shouldTrace x d) (cEval shouldTrace y d)
+iEval shouldTrace (EqElim a m mr x y eq) d
+  = traceIf shouldTrace "eval eqelim" $ rec (cEval shouldTrace eq d)
   where
      mrVal  =  cEval shouldTrace mr d
      rec eqVal =

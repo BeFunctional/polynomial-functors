@@ -3,7 +3,7 @@ module LambdaPi.Printer where
 import Prelude hiding ((<>))
 import Text.PrettyPrint.HughesPJ hiding (parens, text)
 
-import Common
+import LambdaPi.Common
 import LambdaPi.AST
 
 iPrint :: Int -> Int -> ITerm -> Doc
