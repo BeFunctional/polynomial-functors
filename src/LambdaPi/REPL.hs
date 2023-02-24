@@ -67,7 +67,10 @@ class Interpreter (c :: LangTerm -> *) where
   itprint  :: c Val -> Doc
   iiparse  :: Parsec Text () (c Inferrable)
   isparse  :: Parsec Text () (Stmt (c Inferrable) (c Checkable))
-  iassume  :: Logger m => LangState (c Val) (c Val) -> (Text, (c Checkable)) -> m (LangState (c Val) (c Val))
+  iassume  :: Logger m => HasState "poly" (LangState (c Val) (c Val)) m
+           => (Text, (c Checkable)) -> m ()
+  iaddData :: Logger m => HasState "poly" (LangState (c Val) (c Val)) m
+           => Text -> [Text] -> m ()
 
 helpTxt :: [InteractiveCommand] -> Text
 helpTxt cs
@@ -248,13 +251,15 @@ handleStmt :: forall f m. Logger m
 handleStmt stmt = do
     (out, ve, te) <- get @"poly"
     case stmt of
-        Assume ass -> foldM iassume (out, ve, te) ass >>= put @"poly"
+        Assume ass -> mapM_ iassume ass
         Let x e    -> checkEval x e >>= put @"poly"
         Eval e     -> checkEval it e >>= put @"poly"
         PutStrLn x -> logStr x >> return ()
         Out f      -> put @"poly" (f, ve, te)
-        DataDecl nm cs -> undefined
+        DataDecl nm cs -> iaddData nm cs
   where
+    -- How to add a data declaration to the context
+
     checkEval :: Text -> f Inferrable ->
         m (LangState (f Val) (f Val))
     checkEval i t = do

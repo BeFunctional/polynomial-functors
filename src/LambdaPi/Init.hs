@@ -204,13 +204,19 @@ lpve =      [(Global "Zero", VZero),
              (Global "Fin", VLam (\ n -> VFin n)),
              (Global "finElim", cEval False (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) ([],[]))]
 
+lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
+          => Text -> [Text] -> m ()
+lpaddData name constructors = do
+  newState <- lpassume name (Inf Star)
+  pure ()
+
 
 lpassume
-  :: Logger m =>
-     (Text, NameEnv (MLTT' 'Val), Ctx (MLTT' 'Val)) ->
-     Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
-lpassume state@(out, ve, te) x t =
-  check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) state (coerce $ Ann t (Inf Star))
+  :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
+  => Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
+lpassume x t = do
+  (out, ve, te) <- get @"poly"
+  check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) (out, ve, te) (coerce $ Ann t (Inf Star))
         (\ (y, v) -> logStr (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
 printNameContext :: NameEnv Value -> Text
@@ -237,7 +243,8 @@ instance Interpreter MLTT' where
   itprint = cPrint 0 0 . quote0 . coerce
   iiparse = fmap coerce (parseITerm 0 [])
   isparse = fmap coerce (parseStmt [])
-  iassume = \ s (x, t) -> lpassume s x (coerce t)
+  iassume (x, t) = lpassume x (coerce t) >>= put @"poly"
+  iaddData = lpaddData
 
 checkSimple :: (HasState "poly" PolyEngine m)
             => ITerm

@@ -2,6 +2,8 @@ module LambdaPi.AST where
 
 import LambdaPi.Common
 
+import Data.Text
+
 data CTerm
    =  Inf  ITerm
    |  Lam  CTerm
@@ -16,11 +18,17 @@ data CTerm
    |  Comma CTerm CTerm CTerm CTerm -- constructor for Sigma
    |  CTrue
    |  CFalse
+   |  NamedCon Text -- named constructor, user defined
   deriving (Show, Eq)
 
 data ITerm
    =  Ann CTerm CTerm
    |  Star
+   |  NamedTy Text -- named type, user defined
+   -- eliminator for user-defined type
+   |  Match {- scrutinee -} CTerm
+            {- motive -} CTerm
+            {- patterns -} [(CTerm, CTerm)]  -- (lhs, rhs)
    |  Pi CTerm CTerm
    |  Bound  Int
    |  Free  Name
