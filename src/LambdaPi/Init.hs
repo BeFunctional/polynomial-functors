@@ -207,18 +207,26 @@ lpve =      [(Global "Zero", VZero),
 lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
           => Text -> [Text] -> m ()
 lpaddData name constructors = do
-  newState <- lpassume name (Inf Star)
+  lpassume name (Inf Star)
+  mapM_ (lpAddConstructor name) (zip constructors [0 .. ])
   pure ()
 
+lpAddConstructor :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
+  => Text -> (Text, Int) -> m ()
+lpAddConstructor typeName (constructorName, tag) = do
+  modify @"poly" (\(out, ve, te) ->
+    (out, (Global constructorName, coerce (VNamedCon tag)) : ve,
+          (Global constructorName, coerce (VNamedTy typeName)) : te))
 
 lpassume
   :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
-  => Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
+  => Text -> CTerm -> m ()
 lpassume x t = do
   (out, ve, te) <- get @"poly"
   check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) (out, ve, te) (coerce $ Ann t (Inf Star))
         (\ (y, v) -> logStr (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
+  >>= put @"poly"
 printNameContext :: NameEnv Value -> Text
 printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPrint 0 0 (quote0 ty)))
 
@@ -243,7 +251,7 @@ instance Interpreter MLTT' where
   itprint = cPrint 0 0 . quote0 . coerce
   iiparse = fmap coerce (parseITerm 0 [])
   isparse = fmap coerce (parseStmt [])
-  iassume (x, t) = lpassume x (coerce t) >>= put @"poly"
+  iassume (x, t) = lpassume x (coerce t)
   iaddData = lpaddData
 
 checkSimple :: (HasState "poly" PolyEngine m)
@@ -283,7 +291,7 @@ data LogAndStateCtx = LogAndStateCtx
 
 newtype MainM a = MainM (ReaderT LogAndStateCtx IO a)
   deriving (Functor, Applicative, Monad, MonadIO)
-  deriving (HasSource "poly" PolyState
+  deriving ( HasSource "poly" PolyState
            , HasSink "poly" PolyState
            , HasState "poly" PolyState) via
     ReaderIORef (Rename "poly"(Field "poly" ()

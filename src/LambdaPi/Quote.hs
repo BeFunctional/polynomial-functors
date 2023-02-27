@@ -35,6 +35,8 @@ quote ii (VFSucc n f)       = FSucc (quote ii n) (quote ii f)
 quote ii VBool              = Inf IBool
 quote ii VTrue              = CTrue
 quote ii VFalse             = CFalse
+quote ii (VNamedTy t)       = Inf (NamedTy t)
+quote ii (VNamedCon t)      = NamedCon t
 
 neutralQuote :: Int -> Neutral -> ITerm
 neutralQuote ii (NFree v)
@@ -63,6 +65,8 @@ neutralQuote ii (NPolyElim m f val)
    = PolyElim (quote ii m) (quote ii f) (Inf (neutralQuote ii val))
 neutralQuote ii (NIf m th el b)
    = If (quote ii m) (quote ii th) (quote ii el) (Inf (neutralQuote ii b))
+neutralQuote ii (NEnumElim m val branches)
+   = Match (quote ii m) (Inf $ neutralQuote ii val) (fmap (quote ii) branches)
 
 boundfree :: Int -> Name -> ITerm
 boundfree ii (Quote k)     =  Bound ((ii - k - 1) `max` 0)

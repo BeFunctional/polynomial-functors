@@ -116,3 +116,10 @@ iEval shouldTrace (If m th el bool) d
       VFalse -> cEval shouldTrace el d
       VNeutral n -> VNeutral (NIf (cEval shouldTrace m d) (cEval shouldTrace th d) (cEval shouldTrace el d) n)
       n -> error $ "internal: if on non-bool " ++ show (quote0 n)
+iEval shouldTrace (NamedTy nm) d = traceIf shouldTrace "eval namedTy" $ VNamedTy nm
+iEval shouldTrace (Match m scrutinee branches) d = traceIf shouldTrace "eval Match"
+  $ case cEval shouldTrace scrutinee d of
+      VNamedCon tag -> cEval shouldTrace (branches !! tag) d
+      VNeutral n -> VNeutral $
+          NEnumElim (cEval shouldTrace m d) n (fmap (\x -> cEval shouldTrace x d) branches)
+      n -> error $ "internal: matching on incorrect type " ++ show (quote0 n)

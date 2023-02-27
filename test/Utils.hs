@@ -15,7 +15,7 @@ import Capability.Reader
 import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.IO.Class (MonadIO)
 
-import Data.Text
+import Data.Text (Text)
 import Data.IORef
 import Data.Coerce
 
@@ -72,6 +72,11 @@ makeIdStmt =
   Let "id" (Ann (Lam $ Lam (Inf (Bound 0)))
            (Inf (Pi (Inf Star) (Inf $ Pi (Inf $ Bound 0) (Inf $ Bound 1)))))
 
+-- compile and run multple commands sequentially
+commandStrs :: (MonadIO m, HasState "poly" PolyState m, Logger m)
+            => [Text] -> m ()
+commandStrs = mapM_ commandStr
+
 -- compile a command given as a string
 commandStr :: (MonadIO m, HasState "poly" PolyState m, Logger m)
            => Text -> m ()
@@ -97,3 +102,9 @@ eqErrOutput :: TestM () -> [Text] -> Assertion
 eqErrOutput op expectedErrors = do
   (_, _, _, errors) <- runTest' initialContext op
   errors @?= expectedErrors
+
+eqContext :: TestM () -> ([(Name, Value)], [(Name, Value)]) -> Assertion
+eqContext op (expectedValues, expectedTypes) = do
+  (_, (_,values, types), _, _) <- runTest' initialContext op
+  reverse (drop (length lpve) (reverse values)) @?= expectedValues
+  reverse (drop (length lpte) (reverse types)) @?= expectedTypes

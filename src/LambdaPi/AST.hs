@@ -18,7 +18,7 @@ data CTerm
    |  Comma CTerm CTerm CTerm CTerm -- constructor for Sigma
    |  CTrue
    |  CFalse
-   |  NamedCon Text -- named constructor, user defined
+   |  NamedCon Int -- named constructor, user defined, int is tag
   deriving (Show, Eq)
 
 data ITerm
@@ -26,9 +26,10 @@ data ITerm
    |  Star
    |  NamedTy Text -- named type, user defined
    -- eliminator for user-defined type
-   |  Match {- scrutinee -} CTerm
-            {- motive -} CTerm
-            {- patterns -} [(CTerm, CTerm)]  -- (lhs, rhs)
+   |  Match {- motive    -} CTerm
+            {- scrutinee -} CTerm
+            {- patterns  -} [CTerm]  -- List of RHS, appear in the same order as
+                                     -- the data definition
    |  Pi CTerm CTerm
    |  Bound  Int
    |  Free  Name
@@ -74,17 +75,27 @@ data Value
    |  VBool
    |  VTrue
    |  VFalse
+   |  VNamedCon Int
+   |  VNamedTy Text
 
 data Neutral
-   =  NFree  Name
-   |  NApp  Neutral Value
+   =  NFree Name
+   |  NApp Neutral Value
    |  NNatElim Value Value Value Neutral
    |  NVecElim Value Value Value Value Value Neutral
    |  NEqElim Value Value Value Value Value Neutral
    |  NFinElim Value Value Value Value Neutral
    |  NPolyElim Value Value Neutral
    |  NSigElim Value Value Value Value Neutral
-   |  NIf Value Value Value Neutral
+
+   |  NIf {- motive    -} Value
+          {- ifTrue    -} Value
+          {- ifFalse   -} Value
+          {- scrutinee -} Neutral
+
+   |  NEnumElim {- motive    -} Value
+                {- scrutinee -} Neutral
+                {- branches  -} [Value]
 
 type Env = [Value]
 type Type = Value
