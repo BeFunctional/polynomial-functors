@@ -46,6 +46,7 @@ iPrint p ii (If motive thn els arg)
                              = text "if" <+> cPrint p ii arg <+>
                                text "then" <+> cPrint p ii thn <+>
                                text "else" <+> cPrint p ii els
+iPrint p ii (NamedTy n)      = text n
 iPrint p ii x                = text "[" <> text (tshow x) <> text "]"
 
 cPrint :: Int -> Int -> CTerm -> Doc
@@ -66,6 +67,7 @@ cPrint p ii (Comma ty sy x y)
                          = iPrint p ii (Free (Global "MkSigma") :$: ty :$: sy :$: x :$: y)
 cPrint p ii CTrue        = text "True"
 cPrint p ii CFalse       = text "False"
+cPrint p ii (NamedCon t) = text "Constructor(" <> text (tshow t) <> ")"
 
 fromNat :: Int -> Int -> CTerm -> Doc
 fromNat n ii Zero = int n

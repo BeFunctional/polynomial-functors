@@ -25,6 +25,13 @@ cEval shouldTrace (MkPoly s p)     d = traceIf shouldTrace "eval MkPoly"
                                      $ VMkPoly (cEval shouldTrace s d) (cEval shouldTrace p d)
 cEval shouldTrace CTrue            d = traceIf shouldTrace "eval true" $ VTrue
 cEval shouldTrace CFalse           d = traceIf shouldTrace "eval false" $ VFalse
+cEval shouldTrace (Comma t1 t2 v1 v2) d = traceIf shouldTrace "eval comma" $
+  VComma (cEval shouldTrace t1 d)
+         (cEval shouldTrace t2 d)
+         (cEval shouldTrace v1 d)
+         (cEval shouldTrace v2 d)
+cEval shouldTrace (NamedCon t)    d = traceIf shouldTrace "eval named constructor" $
+  VNamedCon t
 
 iEval :: Bool -> ITerm -> (NameEnv Value,Env) -> Value
 iEval shouldTrace (Ann c _)     d = traceIf shouldTrace "eval ann" $  cEval shouldTrace c d

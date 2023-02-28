@@ -24,8 +24,8 @@ haskellP = LanguageDef
          , identLetter    = alphaNum <|> oneOf "_'"
          , opStart        = opLetter haskellP
          , opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
-         , reservedOpNames= []
-         , reservedNames  = ["forall", "let", "assume", "putStrLn", "out"]
+         , reservedOpNames= ["|"]
+         , reservedNames  = ["forall", "let", "assume", "putStrLn", "out", "data"]
          , caseSensitive  = True
          }
 
@@ -48,8 +48,19 @@ stringLiteral' = fmap pack (stringLiteral lambdaPi)
 identifier' :: TextParser () Text
 identifier' = fmap pack (identifier lambdaPi)
 
+parseData :: TextParser () (Text, [Text])
+parseData = do
+    reserved lambdaPi "data"
+    tyName <- identifier'
+    reserved lambdaPi "="
+    constructors <- identifier' `sepBy` reservedOp lambdaPi "|"
+    pure (tyName, constructors)
+
+
 parseStmt :: [Text] -> TextParser () (Stmt ITerm CTerm)
 parseStmt e =
+      fmap (uncurry DataDecl) parseData
+  <|>
       fmap (uncurry Let) (parseLet e)
   <|> do
         reserved lambdaPi "assume"
@@ -64,6 +75,7 @@ parseStmt e =
         x <- option "" stringLiteral'
         return (Out x)
   <|> fmap Eval (parseITerm 0 e)
+
 parseBindings :: Bool -> [Text] -> TextParser () ([Text], [CTerm])
 parseBindings b e =
                    (let rec :: [Text] -> [CTerm] -> TextParser () ([Text], [CTerm])
