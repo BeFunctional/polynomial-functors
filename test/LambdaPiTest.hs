@@ -53,19 +53,26 @@ syntaxTests = testGroup "syntax tests"
     commandStrs ["let id = (\\x y -> y) :: (forall (a :: Type). a -> a)"
                 , "id Nat 3"]
     `eqOutput`
-    ["3 :: Nat"
-    ,"id :: forall (x :: *) (y :: x) . x"]
+    ["id :: forall (x :: *) (y :: x) . x"
+    ,"3 :: Nat"]
   , testCase "data declaration" $
     commandStrs ["data K3 = Yes | No | Unknown"
                 , "K3"
                 , "Yes"
                 ]
     `eqOutput`
-    [ "Yes :: K3"
+    [ "K3 :: *"
     , "K3 :: *"
-    , "K3 :: *"
+    , "Yes :: K3"
     ]
 
+  , testCase "enum eliminator" $
+    commandStrs ["data K3 = Yes | No | Unknwon"
+                , "let count = (\\x -> match x as (\\_ => Nat) { 0 ; 1 ; 2 }) :: K3 -> Nat"
+                , "count No"
+                ]
+    `eqErrOutput`
+    []
   ]
 
 -- tests about polynomial functors
@@ -90,14 +97,17 @@ errorTests = testGroup "error tests"
 -- test from commands
 cmdTests :: TestTree
 cmdTests = testGroup "command tests" $
+
   [ testCase "Type Nat" $
     void (handleCommand @MLTT' (TypeOf "Nat"))
     `eqOutput`
     ["*"]
+
   , testCase "browse" $
     void (handleCommand @MLTT' Browse)
     `eqOutput`
     ["finElim\nFin\nFSucc\nFZero\nif\nFalse\nTrue\nBool\neqElim\nEq\nRefl\nvecElim\nVec\nCons\nNil\nsigElim\nMkSigma\nSigma\npolyElim\nMkPoly\nPoly\nType\nnatElim\nNat\nSucc\nZero\n"]
+
   , testCase "stdlib import" $
     void (handleCommand @MLTT' (Compile (CompileFile "stdlib.lp")))
     `eqErrOutput`
@@ -107,15 +117,18 @@ cmdTests = testGroup "command tests" $
 -- tests from Statements
 stmtTests :: TestTree
 stmtTests = testGroup "statement tests" $
+
   [ testCase "test let id" $
     void (handleStmt @MLTT' (coerce makeIdStmt))
     `eqOutput`
     ["id :: forall (x :: *) (y :: x) . x"]
+
   , testCase "test let id ctx" $
     void (handleStmt @MLTT' (coerce makeIdStmt))
     `eqContext`
     ( [(Global "id", VLam (\x -> VLam (\y -> y)))]
     , [(Global "id", VPi VStar (\x -> VPi x (\_ -> x)))])
+
   , testCase "test data decl Bool" $
     void (handleStmt @MLTT' (DataDecl "Bool" ["True", "False"]))
     `eqContext`
@@ -125,6 +138,7 @@ stmtTests = testGroup "statement tests" $
     , [ (Global "False", VNamedTy "Bool")
       , (Global "True", VNamedTy "Bool")
       , (Global "Bool", VStar)])
+
   , testCase "test data decl K3" $
     void (handleStmt @MLTT' (DataDecl "K3" ["Yes", "No", "Maybe"]))
     `eqContext`

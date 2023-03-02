@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Utils where
 
+
 import Capability.Sink
 import Capability.Source
 import Capability.State
@@ -64,7 +65,7 @@ runTest' st (TestM r) = do
   finalLogs <- readIORef logRef
   finalErrors <- readIORef errRef
   finalState <- readIORef polyRef
-  pure (result, finalState, finalLogs, finalErrors)
+  pure (result, finalState, reverse finalLogs, reverse finalErrors)
 
 -- a simple statement written manually
 makeIdStmt :: Stmt ITerm CTerm
@@ -94,8 +95,14 @@ isEq op endState = do
 -- check if the std output is the one expected
 eqOutput :: TestM () -> [Text] -> Assertion
 eqOutput op printedExpected = do
-  (_, _, printedActual, _) <- runTest' initialContext op
+  (_, _, printedActual, errors) <- runTest' initialContext op
   printedActual @?= printedExpected
+
+eqOutErr :: TestM () -> [Text] -> [Text] -> Assertion
+eqOutErr op printedExpected errorsExpected = do
+  (_, _, printedActual, errors) <- runTest' initialContext op
+  printedActual @?= printedExpected
+  errors @?= errorsExpected
 
 -- check the error output is the one expected
 eqErrOutput :: TestM () -> [Text] -> Assertion
