@@ -73,6 +73,15 @@ syntaxTests = testGroup "syntax tests"
                 ]
     `eqErrOutput`
     []
+
+  , testCase "elim Bool 1" $
+    commandStr "match True as (\\_ -> Nat) { False -> 10; True -> 2 }"
+    `eqOutput`
+    ["2 :: Nat"]
+  , testCase "elim Bool 2" $
+    commandStr "match True as (\\_ -> Nat) { True -> 10; False -> 2 }"
+    `eqOutput`
+    ["10 :: Nat"]
   ]
 
 -- tests about polynomial functors

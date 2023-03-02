@@ -175,8 +175,7 @@ cType shouldTrace ii g (Inf e) v
     v' <- iType shouldTrace ii g e
     unless ( quote0 v == quote0 v')
            (throwError ("type mismatch:\n"
-                     <> "type inferred:  "
-                     <> render (cPrint 0 0 (quote0 v')) <> "\n"
+                     <> "type inferred:  " <> render (cPrint 0 0 (quote0 v')) <> "\n"
                      <> "type expected:  " <> render (cPrint 0 0 (quote0 v)) <> "\n"
                      <> "for expression: " <> render (iPrint 0 0 e)))
 cType shouldTrace ii g (Lam e) ( VPi ty ty')
@@ -281,14 +280,9 @@ iSubst ii r (SigElim t1 t2 m f p)
                              = SigElim (cSubst ii r t1) (cSubst ii r t2)
                                        (cSubst ii r m) (cSubst ii r f)
                                        (cSubst ii r p)
-iSubst ii r IBool            = IBool
-iSubst ii r IFalse           = IFalse
-iSubst ii r ITrue            = ITrue
 iSubst ii r (Match m s p)    = Match (cSubst ii r m) (cSubst ii r s)
                                      (fmap (second (cSubst ii r)) p)
 iSubst ii r (NamedTy nm)     = NamedTy nm
-iSubst ii r (If m t e b)     = If (cSubst ii r m) (cSubst ii r t)
-                                  (cSubst ii r e) (cSubst ii r b)
 
 
 cSubst :: Int -> ITerm -> CTerm -> CTerm
@@ -303,8 +297,6 @@ cSubst ii r  (Cons a n x xs)
 cSubst ii r  (Refl a x)   = Refl (cSubst ii r a) (cSubst ii r x)
 cSubst ii r  (FZero n)    = FZero (cSubst ii r n)
 cSubst ii r  (FSucc n k)  = FSucc (cSubst ii r n) (cSubst ii r k)
-cSubst ii r  CTrue        = CTrue
-cSubst ii r  CFalse       = CFalse
 cSubst ii r  (MkPoly s p) = MkPoly (cSubst ii r s) (cSubst ii r p)
 cSubst ii r  (Comma t1 t2 v1 v2)
                           = Comma (cSubst ii r t1) (cSubst ii r t2)

@@ -129,12 +129,12 @@ lpte =      [(Global "Zero", VNat),
              -- Bool things
              ------------------------------------------------------
              (Global "Bool", VStar),
-             (Global "True", VBool),
-             (Global "False", VBool),
-             (Global "if", (VPi (VPi VBool (const VStar)) (\m -> VPi
-                                (m `vapp` VTrue) (\th -> VPi
-                                (m `vapp` VFalse) (\el -> VPi
-                                VBool (\b ->
+             (Global "True", VNamedTy "Bool"),
+             (Global "False", VNamedTy "Bool"),
+             (Global "if", (VPi (VPi (VNamedTy "Bool") (const VStar)) (\m -> VPi
+                                (m `vapp` (VNamedCon "True" 1)) (\th -> VPi
+                                (m `vapp` (VNamedCon "False" 0)) (\el -> VPi
+                                (VNamedTy "Bool") (\b ->
                                 m `vapp` b)))))),
              ------------------------------------------------------
              -- Finite things
@@ -182,14 +182,14 @@ lpve =      [(Global "Zero", VZero),
                               (Inf (Bound 0)))
                  ) ([],[])),
 
-             (Global "Bool", VBool),
-             (Global "True", VTrue),
-             (Global "False", VFalse),
+             (Global "Bool", VNamedTy "Bool"),
+             (Global "True", VNamedCon "True" 1),
+             (Global "False", VNamedCon "False" 0),
              (Global "if", cEval False (Lam $ Lam $ Lam $ Lam $
-                 Inf (If (Inf (Bound 3))
-                         (Inf (Bound 2))
-                         (Inf (Bound 1))
-                         (Inf (Bound 0)))
+                 Inf (Match (Inf (Bound 3))
+                            (Inf (Bound 0))
+                            [ ("True", Inf (Bound 2))
+                            , ("False", Inf (Bound 1))])
                  ) ([],[])),
              (Global "Nil", VLam (\ a -> VNil a)),
              (Global "Cons", VLam (\ a -> VLam (\ n -> VLam (\ x -> VLam (\ xs ->

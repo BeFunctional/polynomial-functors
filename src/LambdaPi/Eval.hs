@@ -6,6 +6,7 @@ import LambdaPi.Quote
 import LambdaPi.Printer
 
 import Data.Bifunctor (second)
+import Data.Maybe (fromJust)
 import Debug.Utils
 
 cEval :: Bool -> CTerm -> (NameEnv Value,Env) -> Value
@@ -25,8 +26,6 @@ cEval shouldTrace (FSucc n f)      d = traceIf shouldTrace "eval fin succ"
                                      $ VFSucc (cEval shouldTrace n d) (cEval shouldTrace f d)
 cEval shouldTrace (MkPoly s p)     d = traceIf shouldTrace "eval MkPoly"
                                      $ VMkPoly (cEval shouldTrace s d) (cEval shouldTrace p d)
-cEval shouldTrace CTrue            d = traceIf shouldTrace "eval true" $ VTrue
-cEval shouldTrace CFalse           d = traceIf shouldTrace "eval false" $ VFalse
 cEval shouldTrace (Comma t1 t2 v1 v2) d = traceIf shouldTrace "eval comma" $
   VComma (cEval shouldTrace t1 d)
          (cEval shouldTrace t2 d)
@@ -115,20 +114,10 @@ iEval shouldTrace (SigElim ty sy motive f arg) d
           VComma ty sy a b -> (fn `vapp` a) `vapp` b
           VNeutral n       -> VNeutral (NSigElim (cEval shouldTrace ty d) (cEval shouldTrace sy d) (cEval shouldTrace motive d) fn n)
           _ -> error "internal: Eval container"
-iEval shouldTrace IBool  d = traceIf shouldTrace "eval bool" $ VBool
-iEval shouldTrace ITrue  d = traceIf shouldTrace "eval true" $ VTrue
-iEval shouldTrace IFalse d = traceIf shouldTrace "eval false" $ VFalse
-iEval shouldTrace (If m th el bool) d
-  = traceIf shouldTrace "eval if" $
-    case cEval shouldTrace bool d of
-      VTrue -> cEval shouldTrace th d
-      VFalse -> cEval shouldTrace el d
-      VNeutral n -> VNeutral (NIf (cEval shouldTrace m d) (cEval shouldTrace th d) (cEval shouldTrace el d) n)
-      n -> error $ "internal: if on non-bool " ++ show (quote0 n)
 iEval shouldTrace (NamedTy nm) d = traceIf shouldTrace "eval namedTy" $ VNamedTy nm
 iEval shouldTrace (Match m scrutinee branches) d = traceIf shouldTrace "eval Match"
   $ case cEval shouldTrace scrutinee d of
-      VNamedCon nm tag -> cEval shouldTrace (snd $ branches !! tag) d
+      VNamedCon nm tag -> cEval shouldTrace (fromJust $ lookup nm branches) d
       VNeutral n -> VNeutral $
           NEnumElim (cEval shouldTrace m d) n (fmap (second (\x -> cEval shouldTrace x d)) branches)
       n -> error $ "internal: matching on incorrect type " ++ show (quote0 n)

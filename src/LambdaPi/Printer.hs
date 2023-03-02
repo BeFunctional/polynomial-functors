@@ -27,11 +27,6 @@ iPrint p ii (Fin n)          =  iPrint p ii (Free (Global "Fin") :$: n)
 iPrint p ii (FinElim m mz ms n f)
                              =  iPrint p ii (Free (Global "finElim") :$: m :$: mz :$: ms :$: n :$: f)
 iPrint p ii (PolyElim x y z) =  iPrint p ii (Free (Global "polyElim") :$: x :$: y :$: z)
-iPrint p ii (Sigma (Inf IBool) b@(Lam (Inf (If motive thn els (Inf (Bound 0))))))  =
-  -- if isConst 0 motive
-  -- then text "Either" <+> cPrint p (ii + 1) thn <+> cPrint p (ii + 1) els
-  -- else
-  iPrint p ii (Free (Global "Sigma") :$: (Inf IBool) :$: b)
 iPrint p ii (Sigma x y)      =
   -- if isConst 0 y
   -- then lparen <> cPrint p ii x <> comma <+> cPrint p ii y <> rparen
@@ -41,11 +36,6 @@ iPrint p ii (SigElim c y m f v)
                              =  if (isConst 0 f) && (isConst 1 f) -- if the return does not use its arguments
                                 then cPrint p ii f
                                 else iPrint p ii (Free (Global "SigElim") :$: c :$: y :$: m :$: f :$: v)
-iPrint p ii IBool            =  text "Bool"
-iPrint p ii (If motive thn els arg)
-                             = text "if" <+> cPrint p ii arg <+>
-                               text "then" <+> cPrint p ii thn <+>
-                               text "else" <+> cPrint p ii els
 iPrint p ii (NamedTy n)      = text n
 iPrint p ii x                = text "[" <> text (tshow x) <> text "]"
 
@@ -65,8 +55,6 @@ cPrint p ii (FSucc n f)  = iPrint p ii (Free (Global "FSucc") :$: n :$: f)
 cPrint p ii (MkPoly x y) = iPrint p ii (Free (Global "MkPoly") :$: x :$: y)
 cPrint p ii (Comma ty sy x y)
                          = iPrint p ii (Free (Global "MkSigma") :$: ty :$: sy :$: x :$: y)
-cPrint p ii CTrue        = text "True"
-cPrint p ii CFalse       = text "False"
 cPrint p ii (NamedCon nm t) = text nm
 
 fromNat :: Int -> Int -> CTerm -> Doc
@@ -127,12 +115,6 @@ isIConst i (SigElim a b c d e)
     || e == Inf (Bound i)  -- or e is bound by the value we're looking at
     && isConst 0 d         -- And the eliminator does not use the value
     && isConst 1 d)        -- in which case the entire expresion is const
-
-isIConst i (If a b c d)
-  = isConst i a
-  && isConst i b
-  && isConst i c
-  && isConst i d
 isIConst i _ = True
 
 isConst :: Int -> CTerm -> Bool
