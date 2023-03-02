@@ -67,7 +67,7 @@ cPrint p ii (Comma ty sy x y)
                          = iPrint p ii (Free (Global "MkSigma") :$: ty :$: sy :$: x :$: y)
 cPrint p ii CTrue        = text "True"
 cPrint p ii CFalse       = text "False"
-cPrint p ii (NamedCon t) = text "Constructor(" <> text (tshow t) <> ")"
+cPrint p ii (NamedCon nm t) = text nm
 
 fromNat :: Int -> Int -> CTerm -> Doc
 fromNat n ii Zero = int n

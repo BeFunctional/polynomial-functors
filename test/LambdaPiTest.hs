@@ -55,6 +55,16 @@ syntaxTests = testGroup "syntax tests"
     `eqOutput`
     ["3 :: Nat"
     ,"id :: forall (x :: *) (y :: x) . x"]
+  , testCase "data declaration" $
+    commandStrs ["data K3 = Yes | No | Unknown"
+                , "K3"
+                , "Yes"
+                ]
+    `eqOutput`
+    [ "Yes :: K3"
+    , "K3 :: *"
+    , "K3 :: *"
+    ]
 
   ]
 
@@ -109,8 +119,8 @@ stmtTests = testGroup "statement tests" $
   , testCase "test data decl Bool" $
     void (handleStmt @MLTT' (DataDecl "Bool" ["True", "False"]))
     `eqContext`
-    ( [ (Global "False", VNamedCon 1)
-      , (Global "True", VNamedCon 0)
+    ( [ (Global "False", VNamedCon "False" 1)
+      , (Global "True", VNamedCon "True" 0)
       ]
     , [ (Global "False", VNamedTy "Bool")
       , (Global "True", VNamedTy "Bool")
@@ -118,9 +128,9 @@ stmtTests = testGroup "statement tests" $
   , testCase "test data decl K3" $
     void (handleStmt @MLTT' (DataDecl "K3" ["Yes", "No", "Maybe"]))
     `eqContext`
-    ( [ (Global "Maybe", VNamedCon 2)
-      , (Global "No", VNamedCon 1)
-      , (Global "Yes", VNamedCon 0)
+    ( [ (Global "Maybe", VNamedCon "Maybe" 2)
+      , (Global "No", VNamedCon "No" 1)
+      , (Global "Yes", VNamedCon "Yes" 0)
       ]
     , [ (Global "Maybe", VNamedTy "K3")
       , (Global "No", VNamedTy "K3")

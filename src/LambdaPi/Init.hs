@@ -215,7 +215,7 @@ lpAddConstructor :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' '
   => Text -> (Text, Int) -> m ()
 lpAddConstructor typeName (constructorName, tag) = do
   modify @"poly" (\(out, ve, te) ->
-    (out, (Global constructorName, coerce (VNamedCon tag)) : ve,
+    (out, (Global constructorName, coerce (VNamedCon constructorName tag)) : ve,
           (Global constructorName, coerce (VNamedTy typeName)) : te))
 
 lpassume

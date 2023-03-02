@@ -30,8 +30,8 @@ cEval shouldTrace (Comma t1 t2 v1 v2) d = traceIf shouldTrace "eval comma" $
          (cEval shouldTrace t2 d)
          (cEval shouldTrace v1 d)
          (cEval shouldTrace v2 d)
-cEval shouldTrace (NamedCon t)    d = traceIf shouldTrace "eval named constructor" $
-  VNamedCon t
+cEval shouldTrace (NamedCon nm t)  d = traceIf shouldTrace "eval named constructor" $
+  VNamedCon nm t
 
 iEval :: Bool -> ITerm -> (NameEnv Value,Env) -> Value
 iEval shouldTrace (Ann c _)     d = traceIf shouldTrace "eval ann" $  cEval shouldTrace c d
@@ -126,7 +126,7 @@ iEval shouldTrace (If m th el bool) d
 iEval shouldTrace (NamedTy nm) d = traceIf shouldTrace "eval namedTy" $ VNamedTy nm
 iEval shouldTrace (Match m scrutinee branches) d = traceIf shouldTrace "eval Match"
   $ case cEval shouldTrace scrutinee d of
-      VNamedCon tag -> cEval shouldTrace (branches !! tag) d
+      VNamedCon nm tag -> cEval shouldTrace (branches !! tag) d
       VNeutral n -> VNeutral $
           NEnumElim (cEval shouldTrace m d) n (fmap (\x -> cEval shouldTrace x d) branches)
       n -> error $ "internal: matching on incorrect type " ++ show (quote0 n)

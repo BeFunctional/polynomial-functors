@@ -18,7 +18,7 @@ data CTerm
    |  Comma CTerm CTerm CTerm CTerm -- constructor for Sigma
    |  CTrue
    |  CFalse
-   |  NamedCon Int -- named constructor, user defined, int is tag
+   |  NamedCon Text Int -- named constructor, user defined, int is tag
   deriving (Show, Eq)
 
 data ITerm
@@ -75,7 +75,7 @@ data Value
    |  VBool
    |  VTrue
    |  VFalse
-   |  VNamedCon Int
+   |  VNamedCon Text Int
    |  VNamedTy Text
 
 data Neutral

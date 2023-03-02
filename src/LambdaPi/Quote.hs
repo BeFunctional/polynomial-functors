@@ -36,7 +36,7 @@ quote ii VBool              = Inf IBool
 quote ii VTrue              = CTrue
 quote ii VFalse             = CFalse
 quote ii (VNamedTy t)       = Inf (NamedTy t)
-quote ii (VNamedCon t)      = NamedCon t
+quote ii (VNamedCon nm t)   = NamedCon nm t
 
 neutralQuote :: Int -> Neutral -> ITerm
 neutralQuote ii (NFree v)
