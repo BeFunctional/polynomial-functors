@@ -1,8 +1,10 @@
+{-# LANGUAGE LambdaCase #-}
 module LambdaPi.Common where
 
-import Text.PrettyPrint.HughesPJ hiding (parens)
+import Text.PrettyPrint.HughesPJ (Doc)
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Data.Text
+import Data.Bifunctor
 
 data Name
    = Global Text
@@ -43,3 +45,22 @@ text = PP.text . unpack
 tshow :: Show a => a -> Text
 tshow = pack . show
 
+lookupCtx :: Show a => Eq a => [(a, b)] -> a -> Result b
+lookupCtx ctx nm = maybe
+    (Left $ "could not find '" <> tshow nm <> "' in context:\n"
+         <> Data.Text.unlines (fmap (tshow . fst) ctx))
+    Right (lookup nm ctx)
+
+collectErrors :: [Result a] -> Result [a]
+collectErrors results =
+  let collected = collectErrors' results
+  in first (\case { [x] -> x
+                  ; x  -> "multiple errors:\n" <> Data.Text.unlines (fmap (" - " <> ) x)}) collected
+
+  where
+  collectErrors' :: [Result a] -> Either [Text] [a]
+  collectErrors' [x] = bimap pure pure x
+  collectErrors' (Left err : xs) = case collectErrors' xs of
+    Left moreErrors -> Left (err : moreErrors)
+    Right ok -> Left [err]
+  collectErrors' (Right v : xs) = fmap (v :) (collectErrors' xs)

@@ -4,12 +4,14 @@ import Text.PrettyPrint.HughesPJ hiding (parens, (<>), render)
 
 import Control.Monad.Except (throwError, unless)
 
+import Data.Bifunctor
 import Data.Text (Text)
 import LambdaPi.Common
 import LambdaPi.AST
 import LambdaPi.Eval
 import LambdaPi.Quote
 import LambdaPi.Printer
+import LambdaPi.Check.PatternMatching
 
 import Debug.Utils
 
@@ -156,6 +158,15 @@ iType shouldTrace ii g (FinElim m mz ms n f)
     cType shouldTrace ii g f (VFin nVal)
     let fVal = cEval shouldTrace f (fst g, [])
     return (mVal `vapp` nVal `vapp` fVal)
+
+
+iType shouldTrace ii g (Match m s p) =
+    checkPatternMatching (cType shouldTrace ii g)
+                         (\x -> cEval shouldTrace x (fst g, []))
+                         g
+                         m s p
+
+
 iType shouldTrace _ _ tm = throwError $ "No type match for " <> render (iPrint 0 0 tm)
 
 cType :: Bool -> Int -> (NameEnv Value,Context) -> CTerm -> Type -> Result ()
@@ -273,6 +284,12 @@ iSubst ii r (SigElim t1 t2 m f p)
 iSubst ii r IBool            = IBool
 iSubst ii r IFalse           = IFalse
 iSubst ii r ITrue            = ITrue
+iSubst ii r (Match m s p)    = Match (cSubst ii r m) (cSubst ii r s)
+                                     (fmap (second (cSubst ii r)) p)
+iSubst ii r (NamedTy nm)     = NamedTy nm
+iSubst ii r (If m t e b)     = If (cSubst ii r m) (cSubst ii r t)
+                                  (cSubst ii r e) (cSubst ii r b)
+
 
 cSubst :: Int -> ITerm -> CTerm -> CTerm
 cSubst ii i' (Inf i)      = Inf (iSubst ii i' i)
@@ -292,4 +309,5 @@ cSubst ii r  (MkPoly s p) = MkPoly (cSubst ii r s) (cSubst ii r p)
 cSubst ii r  (Comma t1 t2 v1 v2)
                           = Comma (cSubst ii r t1) (cSubst ii r t2)
                                   (cSubst ii r v1) (cSubst ii r v2)
+cSubst ii r  (NamedCon n t) = NamedCon n t
 

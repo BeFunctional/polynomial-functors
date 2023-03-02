@@ -67,8 +67,8 @@ syntaxTests = testGroup "syntax tests"
     ]
 
   , testCase "enum eliminator" $
-    commandStrs ["data K3 = Yes | No | Unknwon"
-                , "let count = (\\x -> match x as (\\_ => Nat) { 0 ; 1 ; 2 }) :: K3 -> Nat"
+    commandStrs [ "data Three = Yes | No | Unknown"
+                , "let count = (\\x -> match x as (\\_ -> Nat) { Yes -> 0 ; No -> 1 ; Unknown -> 2 }) :: Three -> Nat"
                 , "count No"
                 ]
     `eqErrOutput`

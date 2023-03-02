@@ -15,6 +15,7 @@ library
         LambdaPi.REPL
         LambdaPi.AST
         LambdaPi.Check
+        LambdaPi.Check.PatternMatching
         LambdaPi.Eval
         LambdaPi.Parser
         LambdaPi.Printer

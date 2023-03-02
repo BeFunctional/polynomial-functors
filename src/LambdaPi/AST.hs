@@ -28,8 +28,7 @@ data ITerm
    -- eliminator for user-defined type
    |  Match {- motive    -} CTerm
             {- scrutinee -} CTerm
-            {- patterns  -} [CTerm]  -- List of RHS, appear in the same order as
-                                     -- the data definition
+            {- patterns  -} [(Text, CTerm)]  -- List of patterns and RHS
    |  Pi CTerm CTerm
    |  Bound  Int
    |  Free  Name
@@ -95,7 +94,7 @@ data Neutral
 
    |  NEnumElim {- motive    -} Value
                 {- scrutinee -} Neutral
-                {- branches  -} [Value]
+                {- branches  -} [(Text, Value)]
 
 type Env = [Value]
 type Type = Value

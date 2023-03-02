@@ -4,6 +4,8 @@ import LambdaPi.Common
 import LambdaPi.AST
 import LambdaPi.Quote
 import LambdaPi.Printer
+
+import Data.Bifunctor (second)
 import Debug.Utils
 
 cEval :: Bool -> CTerm -> (NameEnv Value,Env) -> Value
@@ -126,7 +128,7 @@ iEval shouldTrace (If m th el bool) d
 iEval shouldTrace (NamedTy nm) d = traceIf shouldTrace "eval namedTy" $ VNamedTy nm
 iEval shouldTrace (Match m scrutinee branches) d = traceIf shouldTrace "eval Match"
   $ case cEval shouldTrace scrutinee d of
-      VNamedCon nm tag -> cEval shouldTrace (branches !! tag) d
+      VNamedCon nm tag -> cEval shouldTrace (snd $ branches !! tag) d
       VNeutral n -> VNeutral $
-          NEnumElim (cEval shouldTrace m d) n (fmap (\x -> cEval shouldTrace x d) branches)
+          NEnumElim (cEval shouldTrace m d) n (fmap (second (\x -> cEval shouldTrace x d)) branches)
       n -> error $ "internal: matching on incorrect type " ++ show (quote0 n)

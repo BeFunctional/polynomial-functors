@@ -24,8 +24,8 @@ haskellP = LanguageDef
          , identLetter    = alphaNum <|> oneOf "_'"
          , opStart        = opLetter haskellP
          , opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
-         , reservedOpNames= ["|"]
-         , reservedNames  = ["forall", "let", "assume", "putStrLn", "out", "data"]
+         , reservedOpNames= ["|", "{", "}", ";"]
+         , reservedNames  = ["forall", "let", "assume", "putStrLn", "out", "data", "match", "as"]
          , caseSensitive  = True
          }
 
@@ -42,6 +42,20 @@ parseLet e =  do
   t <- parseITerm 0 e
   return (x, t)
 
+parseMatch :: [Text] -> TextParser () ITerm
+parseMatch scope = do
+  reserved lambdaPi "match"
+  scrutinee <- parseCTerm 0 scope
+  reserved lambdaPi "as"
+  motive <- parseCTerm 1 scope
+  reservedOp lambdaPi "{"
+  branches <- ((,) <$> identifier' <* reservedOp lambdaPi "->"
+                   <*> parseCTerm 0 scope)
+              `sepBy1` reservedOp lambdaPi ";"
+  reservedOp lambdaPi "}"
+  return (Match motive scrutinee branches)
+
+
 stringLiteral' :: TextParser () Text
 stringLiteral' = fmap pack (stringLiteral lambdaPi)
 
@@ -53,7 +67,7 @@ parseData = do
     reserved lambdaPi "data"
     tyName <- identifier'
     reserved lambdaPi "="
-    constructors <- identifier' `sepBy` reservedOp lambdaPi "|"
+    constructors <- identifier' `sepBy1` reservedOp lambdaPi "|"
     pure (tyName, constructors)
 
 
@@ -94,6 +108,7 @@ parseBindings b e =
                        reserved lambdaPi "::"
                        t <- parseCTerm 0 e
                        return (x : e, [t])
+
 parseITerm :: Int -> [Text] -> TextParser () ITerm
 parseITerm 0 e =
       do
@@ -138,6 +153,7 @@ parseITerm 3 e =
       do
         reserved lambdaPi "*"
         return Star
+  <|> do parseMatch e
   <|> do
         reserved lambdaPi "Poly"
         return Poly
@@ -167,6 +183,7 @@ parseLam e =
          t <- parseCTerm 0 (L.reverse xs ++ e)
          --  reserved lambdaPi "."
          return (iterate Lam t !! length xs)
+
 toNat :: Integer -> ITerm
 toNat n = Ann (toNat' n) (Inf Nat)
 toNat' :: Integer -> CTerm
