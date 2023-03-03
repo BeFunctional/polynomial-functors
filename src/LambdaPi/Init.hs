@@ -158,51 +158,51 @@ lpve :: Ctx Value
 lpve =      [(Global "Zero", VZero),
              (Global "Succ", VLam (\ n -> VSucc n)),
              (Global "Nat", VNat),
-             (Global "natElim", cEval False (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ([], [])),
+             (Global "natElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ),
              (Global "Type", VStar),
              (Global "Poly", VPoly), -- The value for the type Poly
              (Global "MkPoly", VLam (\ty -> VLam (\fy -> VMkPoly ty fy))), -- poly constructor
              (Global "polyElim",
-               cEval False
+               cEval False ([],[])
                      (Lam $ Lam $ Lam $ Inf $
                       PolyElim (Inf (Bound 2))
                                (Inf (Bound 1))
                                (Inf (Bound 0))
-                      ) ([],[])),
+                      )),
              (Global "Sigma", VLam (\a -> VLam (\b -> VSigma a b))),
              (Global "MkSigma", VLam (\a -> VLam
                                      (\b -> VLam
                                      (\v1 -> VLam
                                      (\v2 -> VComma a b v1 v2))))),
-             (Global "sigElim", cEval False (Lam $ Lam $ Lam $ Lam $ Lam $
+             (Global "sigElim", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $ Lam $
                  Inf (SigElim (Inf (Bound 4))
                               (Inf (Bound 3))
                               (Inf (Bound 2))
                               (Inf (Bound 1))
                               (Inf (Bound 0)))
-                 ) ([],[])),
+                 )),
 
              (Global "Bool", VNamedTy "Bool"),
              (Global "True", VNamedCon "True" 1),
              (Global "False", VNamedCon "False" 0),
-             (Global "if", cEval False (Lam $ Lam $ Lam $ Lam $
+             (Global "if", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $
                  Inf (Match (Inf (Bound 3))
                             (Inf (Bound 0))
                             [ ("True", Inf (Bound 2))
                             , ("False", Inf (Bound 1))])
-                 ) ([],[])),
+                 )),
              (Global "Nil", VLam (\ a -> VNil a)),
              (Global "Cons", VLam (\ a -> VLam (\ n -> VLam (\ x -> VLam (\ xs ->
                              VCons a n x xs))))),
              (Global "Vec", VLam (\ a -> VLam (\ n -> VVec a n))),
-             (Global "vecElim", cEval False (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
+             (Global "vecElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))))),
              (Global "Refl", VLam (\ a -> VLam (\ x -> VRefl a x))),
              (Global "Eq", VLam (\ a -> VLam (\ x -> VLam (\ y -> VEq a x y)))),
-             (Global "eqElim", cEval False (Lam (Lam (Lam (Lam (Lam (Lam (Inf (EqElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
+             (Global "eqElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Lam (Inf (EqElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))))),
              (Global "FZero", VLam (\ n -> VFZero n)),
              (Global "FSucc", VLam (\ n -> VLam (\ f -> VFSucc n f))),
              (Global "Fin", VLam (\ n -> VFin n)),
-             (Global "finElim", cEval False (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) ([],[]))]
+             (Global "finElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) )]
 
 lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
           => Text -> [Text] -> m ()
@@ -246,7 +246,7 @@ instance Interpreter MLTT' where
   iprompt = "LP> "
   iitype = \ v c i -> coerce (iType False 0 (coerce v, coerce c) (coerce i))
   iquote = coerce . quote0 . coerce
-  ieval = \ e x -> coerce (iEval False (coerce x) (coerce e, []))
+  ieval = \ e x -> coerce (iEval False (coerce e, []) (coerce x))
   ihastype = id
   icprint = cPrint 0 0 . coerce
   itprint = cPrint 0 0 . quote0 . coerce
@@ -268,7 +268,7 @@ checkSimple term updateState = do
     Left error -> pure ()
     -- success, update the state, print the new result
     Right y   ->
-        let v = iEval False term (coerce oldValueContext, [])
+        let v = iEval False (coerce oldValueContext, []) term
         in put @"poly" (updateState (y, v))
 
 checkPure :: PolyEngine
@@ -279,7 +279,7 @@ checkPure state@(out, ve, te) t k =do
   -- i: Text, t: Type
   --  typecheck and evaluate
   x <- iType False 0 (coerce te, coerce ve) t
-  let v = iEval False t (coerce ve, [])
+  let v = iEval False (coerce ve, []) t
   return (k (x, v))
 
 initialContext :: (Text, Ctx Value, Ctx Value)
