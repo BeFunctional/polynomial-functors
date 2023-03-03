@@ -7,27 +7,27 @@ import LambdaPi.Common
 import LambdaPi.AST
 
 iPrint :: Int -> Int -> ITerm -> Doc
-iPrint p ii (Ann c ty)       =  parensIf (p > 1) (cPrint 2 ii c <> text " :: " <> cPrint 0 ii ty)
-iPrint p ii Star             =  text "*"
-iPrint p ii (Pi d (Inf (Pi d' r)))
-                             =  parensIf (p > 0) (nestedForall (ii + 2) [(ii + 1, d'), (ii, d)] r)
-iPrint p ii (Pi d r)         =  parensIf (p > 0) (sep [text "forall " <> text (vars !! ii) <> text " :: " <> cPrint 0 ii d <> text " .", cPrint 0 (ii + 1) r])
-iPrint p ii (Bound k)        =  text (vars !! (ii - k - 1))
-iPrint p ii (Free (Global s))=  text s
-iPrint p ii (i :$: c)        =  parensIf (p > 2) (sep [iPrint 2 ii i, nest 2 (cPrint 3 ii c)])
-iPrint p ii Nat              =  text "Nat"
-iPrint p ii (NatElim m z s n)=  iPrint p ii (Free (Global "natElim") :$: m :$: z :$: s :$: n)
-iPrint p ii (Vec a n)        =  iPrint p ii (Free (Global "Vec") :$: a :$: n)
+iPrint p ii (Ann c ty)        = parensIf (p > 1) (cPrint 2 ii c <> text " :: " <> cPrint 0 ii ty)
+iPrint p ii Star              = text "*"
+iPrint p ii (Pi d (Inf (Pi d'  r)))
+                              = parensIf (p > 0) (nestedForall (ii + 2) [(ii + 1, d'), (ii, d)] r)
+iPrint p ii (Pi d r)          = parensIf (p > 0) (sep [text "forall " <> text (vars !! ii) <> text " :: " <> cPrint 0 ii d <> text " .", cPrint 0 (ii + 1) r])
+iPrint p ii (Bound k)         = text (vars !! (ii - k - 1))
+iPrint p ii (Free (Global s)) = text s
+iPrint p ii (i :$: c)         = parensIf (p > 2) (sep [iPrint 2 ii i, nest 2 (cPrint 3 ii c)])
+iPrint p ii Nat               = text "Nat"
+iPrint p ii (NatElim m z s n) = iPrint p ii (Free (Global "natElim") :$: m :$: z :$: s :$: n)
+iPrint p ii (Vec a n)         = iPrint p ii (Free (Global "Vec") :$: a :$: n)
 iPrint p ii (VecElim a m mn mc n xs)
-                             =  iPrint p ii (Free (Global "vecElim") :$: a :$: m :$: mn :$: mc :$: n :$: xs)
-iPrint p ii (Eq a x y)       =  iPrint p ii (Free (Global "Eq") :$: a :$: x :$: y)
-iPrint p ii (EqElim a m mr x y eq)
-                             =  iPrint p ii (Free (Global "eqElim") :$: a :$: m :$: mr :$: x :$: y :$: eq)
-iPrint p ii (Fin n)          =  iPrint p ii (Free (Global "Fin") :$: n)
-iPrint p ii (FinElim m mz ms n f)
-                             =  iPrint p ii (Free (Global "finElim") :$: m :$: mz :$: ms :$: n :$: f)
-iPrint p ii (PolyElim x y z) =  iPrint p ii (Free (Global "polyElim") :$: x :$: y :$: z)
-iPrint p ii (Sigma x y)      =
+                              = iPrint p ii (Free (Global "vecElim") :$: a :$: m :$: mn :$: mc :$: n :$: xs)
+iPrint p ii (Eq a x y)        = iPrint p ii (Free (Global "Eq") :$: a :$: x :$: y)
+iPrint p ii (EqElim a m mr x  y eq)
+                              = iPrint p ii (Free (Global "eqElim") :$: a :$: m :$: mr :$: x :$: y :$: eq)
+iPrint p ii (Fin n)           = iPrint p ii (Free (Global "Fin") :$: n)
+iPrint p ii (FinElim m mz ms  n f)
+                              = iPrint p ii (Free (Global "finElim") :$: m :$: mz :$: ms :$: n :$: f)
+iPrint p ii (PolyElim x y z)  = iPrint p ii (Free (Global "polyElim") :$: x :$: y :$: z)
+iPrint p ii (Sigma x y)       =
   -- if isConst 0 y
   -- then lparen <> cPrint p ii x <> comma <+> cPrint p ii y <> rparen
   -- else
@@ -36,7 +36,7 @@ iPrint p ii (SigElim c y m f v)
                              =  if (isConst 0 f) && (isConst 1 f) -- if the return does not use its arguments
                                 then cPrint p ii f
                                 else iPrint p ii (Free (Global "SigElim") :$: c :$: y :$: m :$: f :$: v)
-iPrint p ii (NamedTy n)      = text n
+iPrint p ii (NamedTy n)      = text n -- "NamedTy(" <> text n <> ")" -- this is for debugging
 iPrint p ii x                = text "[" <> text (tshow x) <> text "]"
 
 cPrint :: Int -> Int -> CTerm -> Doc

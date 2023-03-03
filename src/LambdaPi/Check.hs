@@ -170,20 +170,23 @@ iType shouldTrace ii g (Match m s p) =
 iType shouldTrace _ _ tm = throwError $ "No type match for " <> render (iPrint 0 0 tm)
 
 cType :: Bool -> Int -> (NameEnv Value,Context) -> CTerm -> Type -> Result ()
+
 cType shouldTrace ii g (Inf e) v
-  = traceIf shouldTrace "cType Inf" $ do
+  = traceIf shouldTrace ("cType Inf " <> show e) $ do
     v' <- iType shouldTrace ii g e
-    unless ( quote0 v == quote0 v')
+    unless (quote0 v == quote0 v')
            (throwError ("type mismatch:\n"
                      <> "type inferred:  " <> render (cPrint 0 0 (quote0 v')) <> "\n"
                      <> "type expected:  " <> render (cPrint 0 0 (quote0 v)) <> "\n"
                      <> "for expression: " <> render (iPrint 0 0 e)))
+
 cType shouldTrace ii g (Lam e) ( VPi ty ty')
   = traceIf shouldTrace ("cType PI " <> show (cPrint 0 0 (quote 0 ty)) ) $
     cType shouldTrace  (ii + 1) ((\ (d,g) -> (d,  ((Local ii, ty ) : g))) g)
            (cSubst 0 (Free (Local ii)) e) ( ty' (vfree (Local ii)))
-cType shouldTrace ii g Zero      VNat  = traceIf shouldTrace "cType Zero" $ return ()
-cType shouldTrace ii g (Succ k)  VNat  = traceIf shouldTrace "cType Succ" $ cType shouldTrace ii g k VNat
+
+cType shouldTrace ii g Zero     VNat = traceIf shouldTrace "cType Zero" $ return ()
+cType shouldTrace ii g (Succ k) VNat = traceIf shouldTrace "cType Succ" $ cType shouldTrace ii g k VNat
 cType shouldTrace ii g (Comma ty sy x f) (VSigma ty' fy')
   = traceIf shouldTrace "cType Comma" $ do
     cType shouldTrace ii g x ty'
@@ -199,12 +202,14 @@ cType shouldTrace ii g (MkPoly x f) VPoly
     cType shouldTrace ii g x VStar -- check if the first argument is a type
     let xVal = cEval shouldTrace x (fst g, [])
     cType shouldTrace ii g f (VPi xVal (const VStar)) -- check if the second argument is a Π
+
 cType shouldTrace ii g (Nil a) (VVec bVal VZero)
   = traceIf shouldTrace "cType Nil" $ do
     cType shouldTrace ii g a VStar
     let aVal = cEval shouldTrace a (fst g, [])
     unless  (quote0 aVal == quote0 bVal)
             (throwError "type mismatch")
+
 cType shouldTrace ii g (Cons a n x xs) (VVec bVal (VSucc k))
   = traceIf shouldTrace "cType Cons" $ do
     cType shouldTrace ii g a VStar

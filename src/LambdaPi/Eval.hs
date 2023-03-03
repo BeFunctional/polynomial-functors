@@ -9,30 +9,38 @@ import Data.Bifunctor (second)
 import Data.Maybe (fromJust)
 import Debug.Utils
 
-cEval :: Bool -> CTerm -> (NameEnv Value,Env) -> Value
-cEval shouldTrace (Inf  ii)        d = traceIf shouldTrace ("eval Inf ") $ iEval shouldTrace ii d
-cEval shouldTrace (Lam  c)         d = traceIf shouldTrace "eval lam"
-                                     $ VLam (\ x -> cEval shouldTrace c (((\(e, d) -> (e,  (x : d))) d)))
-cEval shouldTrace Zero             d = traceIf shouldTrace "eval zero" $ VZero
-cEval shouldTrace (Succ k)         d = traceIf shouldTrace "eval zero" $ VSucc (cEval shouldTrace k d)
-cEval shouldTrace (Nil a)          d = traceIf shouldTrace "eval Nil" $ VNil (cEval shouldTrace a d)
-cEval shouldTrace (Cons a n x xs)  d = traceIf shouldTrace "eval Cons"
-                                     $ VCons (cEval shouldTrace a d) (cEval shouldTrace n d)
-                                             (cEval shouldTrace x d) (cEval shouldTrace xs d)
-cEval shouldTrace (Refl a x)       d = traceIf shouldTrace "eval REFL"
-                                     $ VRefl (cEval shouldTrace a d) (cEval shouldTrace x d)
-cEval shouldTrace (FZero n)        d = traceIf shouldTrace "eval fin zero" $ VFZero (cEval shouldTrace n d)
-cEval shouldTrace (FSucc n f)      d = traceIf shouldTrace "eval fin succ"
-                                     $ VFSucc (cEval shouldTrace n d) (cEval shouldTrace f d)
-cEval shouldTrace (MkPoly s p)     d = traceIf shouldTrace "eval MkPoly"
-                                     $ VMkPoly (cEval shouldTrace s d) (cEval shouldTrace p d)
-cEval shouldTrace (Comma t1 t2 v1 v2) d = traceIf shouldTrace "eval comma" $
-  VComma (cEval shouldTrace t1 d)
-         (cEval shouldTrace t2 d)
-         (cEval shouldTrace v1 d)
-         (cEval shouldTrace v2 d)
-cEval shouldTrace (NamedCon nm t)  d = traceIf shouldTrace "eval named constructor" $
-  VNamedCon nm t
+cEval :: Bool -> CTerm -> (NameEnv Value, Env) -> Value
+cEval shouldTrace (Inf  ii)           d = traceIf shouldTrace ("eval Inf ") $ iEval shouldTrace ii d
+cEval shouldTrace (Lam  c)            d = traceIf shouldTrace "eval lam"
+                                        $ VLam (\x -> cEval shouldTrace c (((\(e, d) -> (e,  (x : d))) d)))
+cEval shouldTrace Zero                d = traceIf shouldTrace "eval zero" $ VZero
+cEval shouldTrace (Succ k)            d = traceIf shouldTrace "eval zero"
+                                        $ VSucc (cEval shouldTrace k d)
+cEval shouldTrace (Nil a)             d = traceIf shouldTrace "eval Nil"
+                                        $ VNil (cEval shouldTrace a d)
+cEval shouldTrace (Cons a n x xs)     d = traceIf shouldTrace "eval Cons"
+                                        $ VCons (cEval shouldTrace a d)
+                                                (cEval shouldTrace n d)
+                                                (cEval shouldTrace x d)
+                                                (cEval shouldTrace xs d)
+cEval shouldTrace (Refl a x)          d = traceIf shouldTrace "eval REFL"
+                                        $ VRefl (cEval shouldTrace a d)
+                                                (cEval shouldTrace x d)
+cEval shouldTrace (FZero n)           d = traceIf shouldTrace "eval fin zero"
+                                        $ VFZero (cEval shouldTrace n d)
+cEval shouldTrace (FSucc n f)         d = traceIf shouldTrace "eval fin succ"
+                                        $ VFSucc (cEval shouldTrace n d)
+                                                 (cEval shouldTrace f d)
+cEval shouldTrace (MkPoly s p)        d = traceIf shouldTrace "eval MkPoly"
+                                        $ VMkPoly (cEval shouldTrace s d)
+                                                  (cEval shouldTrace p d)
+cEval shouldTrace (Comma t1 t2 v1 v2) d = traceIf shouldTrace "eval comma"
+                                        $ VComma (cEval shouldTrace t1 d)
+                                                 (cEval shouldTrace t2 d)
+                                                 (cEval shouldTrace v1 d)
+                                                 (cEval shouldTrace v2 d)
+cEval shouldTrace (NamedCon nm t)     d = traceIf shouldTrace "eval named constructor"
+                                        $ VNamedCon nm t
 
 iEval :: Bool -> ITerm -> (NameEnv Value,Env) -> Value
 iEval shouldTrace (Ann c _)     d = traceIf shouldTrace "eval ann" $  cEval shouldTrace c d
@@ -42,7 +50,9 @@ iEval shouldTrace (Pi ty ty1)   d = traceIf shouldTrace "eval pi"
                                         (\x -> cEval shouldTrace ty1 (((\(e, d) -> (e,  (x : d))) d)))
 iEval shouldTrace (Bound ii)    d = traceIf shouldTrace "eval bound" $  (snd d) !! ii
 iEval shouldTrace (Free x)      d = traceIf shouldTrace "eval free"
-                                  $ case lookup x (fst d) of Nothing ->  (vfree x); Just v -> v
+                                  $ case lookup x (fst d) of
+                                         Nothing -> traceIf shouldTrace (show x ++ " not found, free variable") (vfree x)
+                                         Just v -> traceIf shouldTrace ("found " ++ show x) v
 iEval shouldTrace (i :$: c)     d = traceIf shouldTrace "eval app"
                                   $ vapp (iEval shouldTrace i d) (cEval shouldTrace c d)
 iEval shouldTrace Nat           d = traceIf shouldTrace "eval net" $ VNat

@@ -208,6 +208,7 @@ lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
           => Text -> [Text] -> m ()
 lpaddData name constructors = do
   lpassume name (Inf Star)
+  modify @"poly" (\(out, ve, te) -> (out, coerce (Global name, VNamedTy name) : ve, te))
   mapM_ (lpAddConstructor name) (zip constructors [0 .. ])
   pure ()
 

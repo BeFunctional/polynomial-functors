@@ -31,7 +31,7 @@ checkPatternMatching checkType eval context m s p = do
     return (mVal `vapp` sVal)
 
 
-
+-- we also need to check patterns are exhaustive
 checkAllPatterns :: (NameEnv Value, Context) -> [Text] -> Result Value
 checkAllPatterns (_, ctx) patterns = do
   types <- collectErrors $ fmap

@@ -82,6 +82,10 @@ syntaxTests = testGroup "syntax tests"
     commandStr "match True as (\\_ -> Nat) { True -> 10; False -> 2 }"
     `eqOutput`
     ["10 :: Nat"]
+  , testCase "idBool" $
+    commandStr "let idBool = (\\x -> match x as (\\_ -> Bool) { True -> True ; False -> False }) :: Bool -> Bool"
+    `eqOutput`
+    ["idBool :: forall x :: Bool . Bool"]
   ]
 
 -- tests about polynomial functors
@@ -143,6 +147,7 @@ stmtTests = testGroup "statement tests" $
     `eqContext`
     ( [ (Global "False", VNamedCon "False" 1)
       , (Global "True", VNamedCon "True" 0)
+      , (Global "Bool", VNamedTy "Bool")
       ]
     , [ (Global "False", VNamedTy "Bool")
       , (Global "True", VNamedTy "Bool")
@@ -154,6 +159,7 @@ stmtTests = testGroup "statement tests" $
     ( [ (Global "Maybe", VNamedCon "Maybe" 2)
       , (Global "No", VNamedCon "No" 1)
       , (Global "Yes", VNamedCon "Yes" 0)
+      , (Global "K3", VNamedTy "K3")
       ]
     , [ (Global "Maybe", VNamedTy "K3")
       , (Global "No", VNamedTy "K3")
