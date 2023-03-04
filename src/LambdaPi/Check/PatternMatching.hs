@@ -1,7 +1,8 @@
 module LambdaPi.Check.PatternMatching where
 
 import Data.Bifunctor
-import Data.Text (Text)
+import Data.Text (Text, unlines)
+import Data.List
 
 import LambdaPi.AST
 import LambdaPi.Common
@@ -13,9 +14,11 @@ checkPatternMatching
      -> (CTerm -> Value)
      -> (NameEnv Value, Context)
      -> CTerm -> CTerm -> [(Text, CTerm)] -> Result Value
-checkPatternMatching checkType eval context m s p = do
+checkPatternMatching checkType eval context m s clauses = do
+    let patterns = fmap fst clauses
     -- first we check that all patterns are the same type and we return it if successful
-    sType <- checkAllPatterns context (fmap fst p)
+    sType <- checkAllPatterns context patterns
+    checkPatternExhaustive context patterns sType
 
     -- This will give us enough information to check the type of the motive and the scrutinee
     checkType m (VPi sType (\_ -> VStar) )
@@ -28,8 +31,25 @@ checkPatternMatching checkType eval context m s p = do
     -- declaration order.
     mapM_ (\(con, branch) -> do
       constructorForId <- lookupCtx (fst context) con
-      checkType branch (mVal `vapp` constructorForId)) (fmap (first Global) p)
+      checkType branch (mVal `vapp` constructorForId)) (fmap (first Global) clauses)
     return (mVal `vapp` sVal)
+
+checkPatternExhaustive :: (NameEnv Value, Context) -> [Text] -> Value -> Result ()
+checkPatternExhaustive ctx patterns scrutineeType = do
+    constructors <- findAllConstructors
+    case constructors \\ patterns of
+      [] -> pure () -- if the difference between the constructors is empty, they are all here
+      -- Otherwise, return the ones that are missing
+      xs -> Left ("Non-exhaustive pattern match, missing:\n" <>
+                  Data.Text.unlines (fmap (" - " <>) xs))
+    where
+    findAllConstructors :: Result [Text]
+    findAllConstructors =
+      let allConstructors = [n | (Global n, ty) <- snd ctx
+                               , quote0 ty == quote0 scrutineeType ]
+      in case allConstructors of
+        [] -> Left ("No constructors founds for type " <> tshow scrutineeType)
+        xs -> Right xs
 
 
 -- Check that all patterns are the same type

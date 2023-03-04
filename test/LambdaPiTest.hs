@@ -105,12 +105,14 @@ errorTests = testGroup "error tests"
      \type expected:  Bool\n\
      \for expression: 1 :: Nat"
     ]
+
   , testCase "Non-exhaustive pattern match" $
     commandStr "match True as (\\_ -> Nat) { False -> 0 }"
     `eqErrOutput`
-    ["Non-exhaustive pattern match, missing:\\n - True"]
+    ["Non-exhaustive pattern match, missing:\n - True\n"]
+
   , testCase "Mixed types in patterns" $
-    commandStrs ["data U = U1"
+    commandStrs [ "data U = U1"
                 , "match True as (\\_ -> Nat) { False -> 0 ; U1 -> 1 }"]
     `eqErrOutput`
     ["constructor False does not match expected type U"]
