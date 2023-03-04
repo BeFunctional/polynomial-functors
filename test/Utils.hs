@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Utils where
 
+
 import Capability.Sink
 import Capability.Source
 import Capability.State
@@ -15,7 +16,7 @@ import Capability.Reader
 import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.IO.Class (MonadIO)
 
-import Data.Text
+import Data.Text (Text)
 import Data.IORef
 import Data.Coerce
 
@@ -64,13 +65,18 @@ runTest' st (TestM r) = do
   finalLogs <- readIORef logRef
   finalErrors <- readIORef errRef
   finalState <- readIORef polyRef
-  pure (result, finalState, finalLogs, finalErrors)
+  pure (result, finalState, reverse finalLogs, reverse finalErrors)
 
 -- a simple statement written manually
 makeIdStmt :: Stmt ITerm CTerm
 makeIdStmt =
   Let "id" (Ann (Lam $ Lam (Inf (Bound 0)))
            (Inf (Pi (Inf Star) (Inf $ Pi (Inf $ Bound 0) (Inf $ Bound 1)))))
+
+-- compile and run multple commands sequentially
+commandStrs :: (MonadIO m, HasState "poly" PolyState m, Logger m)
+            => [Text] -> m ()
+commandStrs = mapM_ commandStr
 
 -- compile a command given as a string
 commandStr :: (MonadIO m, HasState "poly" PolyState m, Logger m)
@@ -89,11 +95,23 @@ isEq op endState = do
 -- check if the std output is the one expected
 eqOutput :: TestM () -> [Text] -> Assertion
 eqOutput op printedExpected = do
-  (_, _, printedActual, _) <- runTest' initialContext op
+  (_, _, printedActual, errors) <- runTest' initialContext op
   printedActual @?= printedExpected
+
+eqOutErr :: TestM () -> [Text] -> [Text] -> Assertion
+eqOutErr op printedExpected errorsExpected = do
+  (_, _, printedActual, errors) <- runTest' initialContext op
+  printedActual @?= printedExpected
+  errors @?= errorsExpected
 
 -- check the error output is the one expected
 eqErrOutput :: TestM () -> [Text] -> Assertion
 eqErrOutput op expectedErrors = do
   (_, _, _, errors) <- runTest' initialContext op
   errors @?= expectedErrors
+
+eqContext :: TestM () -> ([(Name, Value)], [(Name, Value)]) -> Assertion
+eqContext op (expectedValues, expectedTypes) = do
+  (_, (_,values, types), _, _) <- runTest' initialContext op
+  reverse (drop (length lpve) (reverse values)) @?= expectedValues
+  reverse (drop (length lpte) (reverse types)) @?= expectedTypes

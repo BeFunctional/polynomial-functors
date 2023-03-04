@@ -129,12 +129,12 @@ lpte =      [(Global "Zero", VNat),
              -- Bool things
              ------------------------------------------------------
              (Global "Bool", VStar),
-             (Global "True", VBool),
-             (Global "False", VBool),
-             (Global "if", (VPi (VPi VBool (const VStar)) (\m -> VPi
-                                (m `vapp` VTrue) (\th -> VPi
-                                (m `vapp` VFalse) (\el -> VPi
-                                VBool (\b ->
+             (Global "True", VNamedTy "Bool"),
+             (Global "False", VNamedTy "Bool"),
+             (Global "if", (VPi (VPi (VNamedTy "Bool") (const VStar)) (\m -> VPi
+                                (m `vapp` (VNamedCon "True" 1)) (\th -> VPi
+                                (m `vapp` (VNamedCon "False" 0)) (\el -> VPi
+                                (VNamedTy "Bool") (\b ->
                                 m `vapp` b)))))),
              ------------------------------------------------------
              -- Finite things
@@ -158,61 +158,76 @@ lpve :: Ctx Value
 lpve =      [(Global "Zero", VZero),
              (Global "Succ", VLam (\ n -> VSucc n)),
              (Global "Nat", VNat),
-             (Global "natElim", cEval False (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ([], [])),
+             (Global "natElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ),
              (Global "Type", VStar),
              (Global "Poly", VPoly), -- The value for the type Poly
              (Global "MkPoly", VLam (\ty -> VLam (\fy -> VMkPoly ty fy))), -- poly constructor
              (Global "polyElim",
-               cEval False
+               cEval False ([],[])
                      (Lam $ Lam $ Lam $ Inf $
                       PolyElim (Inf (Bound 2))
                                (Inf (Bound 1))
                                (Inf (Bound 0))
-                      ) ([],[])),
+                      )),
              (Global "Sigma", VLam (\a -> VLam (\b -> VSigma a b))),
              (Global "MkSigma", VLam (\a -> VLam
                                      (\b -> VLam
                                      (\v1 -> VLam
                                      (\v2 -> VComma a b v1 v2))))),
-             (Global "sigElim", cEval False (Lam $ Lam $ Lam $ Lam $ Lam $
+             (Global "sigElim", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $ Lam $
                  Inf (SigElim (Inf (Bound 4))
                               (Inf (Bound 3))
                               (Inf (Bound 2))
                               (Inf (Bound 1))
                               (Inf (Bound 0)))
-                 ) ([],[])),
+                 )),
 
-             (Global "Bool", VBool),
-             (Global "True", VTrue),
-             (Global "False", VFalse),
-             (Global "if", cEval False (Lam $ Lam $ Lam $ Lam $
-                 Inf (If (Inf (Bound 3))
-                         (Inf (Bound 2))
-                         (Inf (Bound 1))
-                         (Inf (Bound 0)))
-                 ) ([],[])),
+             (Global "Bool", VNamedTy "Bool"),
+             (Global "True", VNamedCon "True" 1),
+             (Global "False", VNamedCon "False" 0),
+             (Global "if", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $
+                 Inf (Match (Inf (Bound 3))
+                            (Inf (Bound 0))
+                            [ ("True", Inf (Bound 2))
+                            , ("False", Inf (Bound 1))])
+                 )),
              (Global "Nil", VLam (\ a -> VNil a)),
              (Global "Cons", VLam (\ a -> VLam (\ n -> VLam (\ x -> VLam (\ xs ->
                              VCons a n x xs))))),
              (Global "Vec", VLam (\ a -> VLam (\ n -> VVec a n))),
-             (Global "vecElim", cEval False (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
+             (Global "vecElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))))),
              (Global "Refl", VLam (\ a -> VLam (\ x -> VRefl a x))),
              (Global "Eq", VLam (\ a -> VLam (\ x -> VLam (\ y -> VEq a x y)))),
-             (Global "eqElim", cEval False (Lam (Lam (Lam (Lam (Lam (Lam (Inf (EqElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))))) ([],[])),
+             (Global "eqElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Lam (Inf (EqElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))))),
              (Global "FZero", VLam (\ n -> VFZero n)),
              (Global "FSucc", VLam (\ n -> VLam (\ f -> VFSucc n f))),
              (Global "Fin", VLam (\ n -> VFin n)),
-             (Global "finElim", cEval False (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) ([],[]))]
+             (Global "finElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) )]
 
+lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
+          => Text -> [Text] -> m ()
+lpaddData name constructors = do
+  lpassume name (Inf Star)
+  modify @"poly" (\(out, ve, te) -> (out, coerce (Global name, VNamedTy name) : ve, te))
+  mapM_ (lpAddConstructor name) (zip constructors [0 .. ])
+  pure ()
+
+lpAddConstructor :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
+  => Text -> (Text, Int) -> m ()
+lpAddConstructor typeName (constructorName, tag) = do
+  modify @"poly" (\(out, ve, te) ->
+    (out, (Global constructorName, coerce (VNamedCon constructorName tag)) : ve,
+          (Global constructorName, coerce (VNamedTy typeName)) : te))
 
 lpassume
-  :: Logger m =>
-     (Text, NameEnv (MLTT' 'Val), Ctx (MLTT' 'Val))
-     -> Text -> CTerm -> m (LangState (MLTT' 'Val) (MLTT' 'Val))
-lpassume state@(out, ve, te) x t =
-  check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) state (coerce $ Ann t (Inf Star))
+  :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
+  => Text -> CTerm -> m ()
+lpassume x t = do
+  (out, ve, te) <- get @"poly"
+  check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) (out, ve, te) (coerce $ Ann t (Inf Star))
         (\ (y, v) -> logStr (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))
         (\ (y, v) -> (out, ve, (Global x, v) : te))
+  >>= put @"poly"
 printNameContext :: NameEnv Value -> Text
 printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPrint 0 0 (quote0 ty)))
 
@@ -231,13 +246,14 @@ instance Interpreter MLTT' where
   iprompt = "LP> "
   iitype = \ v c i -> coerce (iType False 0 (coerce v, coerce c) (coerce i))
   iquote = coerce . quote0 . coerce
-  ieval = \ e x -> coerce (iEval False (coerce x) (coerce e, []))
+  ieval = \ e x -> coerce (iEval False (coerce e, []) (coerce x))
   ihastype = id
   icprint = cPrint 0 0 . coerce
   itprint = cPrint 0 0 . quote0 . coerce
   iiparse = fmap coerce (parseITerm 0 [])
   isparse = fmap coerce (parseStmt [])
-  iassume = \ s (x, t) -> lpassume s x (coerce t)
+  iassume (x, t) = lpassume x (coerce t)
+  iaddData = lpaddData
 
 checkSimple :: (HasState "poly" PolyEngine m)
             => ITerm
@@ -252,7 +268,7 @@ checkSimple term updateState = do
     Left error -> pure ()
     -- success, update the state, print the new result
     Right y   ->
-        let v = iEval False term (coerce oldValueContext, [])
+        let v = iEval False (coerce oldValueContext, []) term
         in put @"poly" (updateState (y, v))
 
 checkPure :: PolyEngine
@@ -263,7 +279,7 @@ checkPure state@(out, ve, te) t k =do
   -- i: Text, t: Type
   --  typecheck and evaluate
   x <- iType False 0 (coerce te, coerce ve) t
-  let v = iEval False t (coerce ve, [])
+  let v = iEval False (coerce ve, []) t
   return (k (x, v))
 
 initialContext :: (Text, Ctx Value, Ctx Value)
@@ -276,7 +292,7 @@ data LogAndStateCtx = LogAndStateCtx
 
 newtype MainM a = MainM (ReaderT LogAndStateCtx IO a)
   deriving (Functor, Applicative, Monad, MonadIO)
-  deriving (HasSource "poly" PolyState
+  deriving ( HasSource "poly" PolyState
            , HasSink "poly" PolyState
            , HasState "poly" PolyState) via
     ReaderIORef (Rename "poly"(Field "poly" ()

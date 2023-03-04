@@ -15,6 +15,7 @@ library
         LambdaPi.REPL
         LambdaPi.AST
         LambdaPi.Check
+        LambdaPi.Check.PatternMatching
         LambdaPi.Eval
         LambdaPi.Parser
         LambdaPi.Printer
@@ -34,7 +35,7 @@ library
     , extra
 
   extensions: LambdaCase, OverloadedStrings, TupleSections
-  ghc-options: -fwarn-incomplete-uni-patterns
+  ghc-options: -fwarn-incomplete-patterns
   hs-source-dirs: src
   default-language: Haskell2010
 
