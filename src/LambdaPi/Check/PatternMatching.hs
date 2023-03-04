@@ -6,6 +6,7 @@ import Data.Text (Text)
 import LambdaPi.AST
 import LambdaPi.Common
 import LambdaPi.Quote
+import LambdaPi.Printer
 
 checkPatternMatching
      :: (CTerm -> Type -> Result ())
@@ -31,7 +32,7 @@ checkPatternMatching checkType eval context m s p = do
     return (mVal `vapp` sVal)
 
 
--- we also need to check patterns are exhaustive
+-- Check that all patterns are the same type
 checkAllPatterns :: (NameEnv Value, Context) -> [Text] -> Result Value
 checkAllPatterns (_, ctx) patterns = do
   types <- collectErrors $ fmap
@@ -48,7 +49,7 @@ checkAllPatterns (_, ctx) patterns = do
         getType <- checkAllSame tys
         if quote0 getType == quote0 ty
           then pure ty
-          else Left ("constuctor " <> con
-            <> " does not match type "
-            <> tshow (quote0 getType))
+          else Left ("constructor " <> con
+            <> " does not match expected type "
+            <> tshow (cPrint 0 0 (quote0 getType)))
 
