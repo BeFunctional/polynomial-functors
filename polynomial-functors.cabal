@@ -39,33 +39,6 @@ library
   hs-source-dirs: src
   default-language: Haskell2010
 
-executable lp
-    main-is: Main.hs
-    buildable: True
-    hs-source-dirs: src
-    build-depends:
-        base >=4.9.1.0
-      , mtl >=2.2.1
-      , parsec >=3.1.11
-      , pretty >=1.1.3.5
-      , text
-      , capability
-      , extra
-    extensions: LambdaCase, OverloadedStrings, TupleSections
-    other-modules:
-        LambdaPi.Common
-        LambdaPi.REPL
-        LambdaPi.AST
-        LambdaPi.Check
-        LambdaPi.Eval
-        LambdaPi.Init
-        LambdaPi.Parser
-        LambdaPi.Printer
-        LambdaPi.Quote
-        Debug.Utils
-    default-language: Haskell2010
-
-
 test-suite polynomial-functors-test
   default-language: Haskell2010
   type:             exitcode-stdio-1.0
