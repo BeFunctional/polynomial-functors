@@ -69,6 +69,14 @@ instance
       coerce (C.ask @"logger" >>= liftIO . ($ msg) . snd3 :: m ())
     logErr msg =
       coerce (C.ask @"logger" >>= liftIO . ($ msg) . thd3 :: m ())
+
+newtype NoLogger m a = NoLogger (m a)
+  deriving (Functor, Applicative, Monad)
+
+instance Monad m => Logger (NoLogger m) where
+  logStr _ = pure ()
+  logIn  _ = pure ()
+  logErr _ = pure ()
 --
 -- | Deriving @HasReader@ from @MonadReader@.
 newtype LogM m (a :: Type) = LogM (ReaderT LogCtx m a)

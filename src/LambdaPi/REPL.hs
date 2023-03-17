@@ -1,16 +1,25 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module LambdaPi.REPL where
 
 import Prelude hiding (print, writeFile, putStrLn, readFile, putStr, getLine, show)
 
+import Capability.Constraints
 import Capability.State
+import Capability.Reader
 import Effect.Logger
 
 import Control.Monad.Except
@@ -19,8 +28,10 @@ import Control.Monad.Except
 import Data.List as LS
 import Data.Char
 import Data.Functor.Identity
+import Data.Generics.Product
 import Data.Text as T
 import Data.Text.IO as T
+import Data.Kind (Type)
 import Text.PrettyPrint.HughesPJ hiding (parens, render, text, (<>), char)
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Text.ParserCombinators.Parsec hiding (parse, State)
@@ -30,6 +41,8 @@ import Text.ParserCombinators.Parsec.Token
 import Text.ParserCombinators.Parsec.Language
 import System.IO (hFlush, stdout)
 import System.IO.Error
+
+import GHC.Generics (Generic)
 
 import LambdaPi.Common
 
@@ -48,7 +61,27 @@ data CompileForm
 data InteractiveCommand = Cmd [Text] Text (Text -> Command) Text
 
 type Ctx inf = [(Name, inf)]
-type LangState v inf = (Text, NameEnv v, Ctx inf)
+data LangState v inf = LangState
+  { out :: Text
+  , valCtx :: NameEnv v
+  , tyCtx :: Ctx inf
+  }
+  deriving (Show, Eq, Generic)
+
+-- convert from an operation on HasState "poly" to an operation on
+-- HasReader "values". It extracts the value context from the state.
+stateValuesRead
+    :: (HasState "poly" (LangState vals tys) m)
+    => (forall m'. HasReader "values" (NameEnv vals) m' => m' a) -> m a
+stateValuesRead x
+    = zoom @"values" @(Rename "valCtx" :.: Field "valCtx" "poly") @'[]
+      (magnify @"values" @ReadStatePure @'[] x)
+
+readContext
+    :: forall m f a. (HasState "poly" (LangState (f Val) (f Val)) m)
+    => Logger m
+    => (forall m'. Logger m' => HasReader "poly" (LangState (f Val) (f Val)) m' => m' a) -> m a
+readContext op = magnify @"poly" @ReadStatePure @'[Logger] @(LangState (f Val) (f Val)) op
 
 data LangTerm
    = Inferrable
@@ -59,9 +92,11 @@ data LangTerm
 class Interpreter (c :: LangTerm -> *) where
   iname    :: Text
   iprompt  :: Text
-  iitype   :: NameEnv (c Val) -> Ctx (c Val) -> (c Inferrable) -> Result (c Val)
+  iitype   :: HasReader "poly" (LangState (c Val) (c Val)) m
+           => (c Inferrable) -> m (Result (c Val))
   iquote   :: (c Val) -> (c Checkable)
-  ieval    :: NameEnv (c Val) -> (c Inferrable) -> (c Val)
+  ieval    :: HasReader "values" (NameEnv (c Val)) m
+           => c Inferrable -> m (c Val)
   ihastype :: c Val -> c Val
   icprint  :: c Checkable -> Doc
   itprint  :: c Val -> Doc
@@ -185,29 +220,33 @@ interpretCommand x
 
 data Feedback = Continue | Abort
 
-handleCommand :: forall f m. (Logger m, MonadIO m, HasState "poly" (LangState (f Val) (f Val)) m)
-              => Interpreter f
-              => Command -> m Feedback
+handleCommand
+    :: forall f m. (Logger m, MonadIO m)
+    => HasState "poly" (LangState (f Val) (f Val)) m
+    => Interpreter f
+    => Command -> m Feedback
 handleCommand cmd = do
-    (out, ve, te) <- get @"poly"
+    (LangState out ve te) <- get @"poly"
     case cmd of
        Quit   ->  (logStr "!@#$^&*") >> return Abort
        Noop   ->  return Continue
        Help   ->  logStr (helpTxt commands)
               >> return Continue
-       TypeOf x ->
-         do  x <- parseM "<interactive>" iiparse x
-             t <- maybe (return Nothing) (iinfer ve te) x
-             maybe (return ())
-                   (\u -> logStr (render (itprint u)))
-                   t
-             return Continue
+       TypeOf x -> do
+           x <- parseM "<interactive>" (iiparse @f) x
+           t :: Maybe (f Val) <- case x of
+                                   Nothing -> pure Nothing
+                                   Just x -> readContext (iinfer x)
+           maybe (return ())
+                 (\u -> logStr (render (itprint u)))
+                 t
+           return Continue
        Browse ->  do logIn (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
                      return Continue
        Compile c -> do
             case c of
-              CompileInteractive s -> compilePhrase s
-              CompileFile f        -> compileFile f
+                CompileInteractive s -> compilePhrase s
+                CompileFile f        -> compileFile f
             return Continue
 
 compileFile
@@ -233,12 +272,15 @@ compilePhrase input = do
     parsedInput <- parseM "<interactive>" isparse input
     maybe (return ()) handleStmt parsedInput
 
-iinfer :: Logger m
+iinfer
+    :: Logger m
     => Interpreter f
-    => NameEnv (f Val) -> Ctx (f Val) -> (f Inferrable)
+    => HasReader "poly" (LangState (f Val) (f Val)) m
+    => (f Inferrable)
     -> m (Maybe (f Val))
-iinfer d g t =
-  case iitype d g t of
+iinfer t = do
+  ty <- iitype t
+  case ty of
     Left e -> logErr e >> return Nothing
     Right v -> return (Just v)
 
@@ -249,58 +291,59 @@ handleStmt :: forall f m. Logger m
            => Stmt (f Inferrable) (f Checkable)
            -> m ()
 handleStmt stmt = do
-    (out, ve, te) <- get @"poly"
+    (LangState out ve te) <- get @"poly"
     case stmt of
         Assume ass -> mapM_ iassume ass
-        Let x e    -> checkEval x e >>= put @"poly"
-        Eval e     -> checkEval it e >>= put @"poly"
+        Let x e    -> checkEval x e
+        Eval e     -> checkEval it e
         PutStrLn x -> logStr x >> return ()
-        Out f      -> put @"poly" (f, ve, te)
+        Out f      -> put @"poly" (LangState f ve te)
         DataDecl nm cs -> iaddData nm cs
   where
     -- How to add a data declaration to the context
 
     checkEval :: Text -> f Inferrable ->
-        m (LangState (f Val) (f Val))
+        m ()
     checkEval i t = do
-      (out, ve, te) <- get @"poly"
-      check (tshow . itprint) (out, ve, te) t
+      (LangState out ve te) <- get @"poly"
+      check t
         (\ (y, v) -> do
-          --  ugly, but we have limited space in the paper
-          --  usually, you'd want to have the bound identifier *and*
-          --  the result of evaluation
           let outtext = if i == it
               then render (icprint (iquote v) PP.<> text " :: " PP.<> itprint y)
               else render (text i PP.<> text " :: " PP.<> itprint y)
           logStr outtext
           unless (T.null out) (liftIO $ writeFile (unpack out) (process outtext)))
-        (\ (y, v) -> ("",
-            (Global i, v) : ve,
-            (Global i, ihastype y) : te))
+        (\ (y, v) (LangState out ve te) -> (LangState ""
+            ((Global i, v) : ve)
+            ((Global i, ihastype y) : te))
+        )
+
+newtype ValuesFromCtx (m :: Type -> Type) (a :: Type) = ValuesFromCtx (m a)
+  deriving (Functor, Applicative, Monad)
+
 
 check :: forall f m. Logger m
       => Interpreter f
-      -- how to print
-      => (f Val -> Text)
+      => HasState "poly" (LangState (f Val) (f Val)) m
       -- the state in which we typecheck
-      -> LangState (f Val) (f Val)
       -- the term to check
-      -> f Inferrable
+      => f Inferrable
       -- a way to print the result
       -> ((f Val, f Val) -> m ())
       -- a way to update the state
-      -> ((f Val, f Val) -> LangState (f Val) (f Val))
-      -> m (LangState (f Val) (f Val))
-check showt state@(out, ve, te) t print k = do
+      -> ((f Val, f Val) -> LangState (f Val) (f Val) -> LangState (f Val) (f Val))
+      -> m ()
+check t print k = do
   --  typecheck and evaluate
-  x <- iinfer ve te t
+  x <- readContext (iinfer t)
   case x of
-    Nothing ->
-      return state
-    Just y -> do
-      let v = ieval ve t
-      print (y, v)
-      return (k (y, v))
+    Nothing -> pure ()
+    Just ty -> do
+      val <- stateValuesRead (ieval t)
+      print (ty, val)
+      st <- get @"poly"
+      put @"poly" (k (ty, val) st)
+
 
 
 it :: Text

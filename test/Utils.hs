@@ -112,6 +112,6 @@ eqErrOutput op expectedErrors = do
 
 eqContext :: TestM () -> ([(Name, Value)], [(Name, Value)]) -> Assertion
 eqContext op (expectedValues, expectedTypes) = do
-  (_, (_,values, types), _, _) <- runTest' initialContext op
+  (_, (LangState _ values types), _, _) <- runTest' initialContext op
   reverse (drop (length lpve) (reverse values)) @?= expectedValues
   reverse (drop (length lpte) (reverse types)) @?= expectedTypes
