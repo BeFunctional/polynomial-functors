@@ -52,6 +52,7 @@ executable lp
       , text
       , capability
       , extra
+      , generic-lens
     extensions: LambdaCase, OverloadedStrings, TupleSections
     other-modules:
         LambdaPi.Common
