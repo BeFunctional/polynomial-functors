@@ -33,6 +33,7 @@ library
     , tasty-hunit
     , capability
     , extra
+    , generic-lens
 
   extensions: LambdaCase, OverloadedStrings, TupleSections
   ghc-options: -fwarn-incomplete-patterns

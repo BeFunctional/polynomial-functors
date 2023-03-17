@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeOperators #-}
@@ -22,7 +23,9 @@ import Prelude hiding (unlines, putStr)
 import Data.Text (Text, unlines)
 import Data.Text.IO (putStr)
 import Data.Coerce
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.IORef
+import Data.List (find)
 
 import GHC.Generics
 
@@ -35,6 +38,7 @@ import Capability.Reader
 import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.Writer.Class
 import Control.Monad.IO.Class
+import Control.Monad.State (State, runState)
 
 import LambdaPi.AST
 import LambdaPi.Eval
@@ -208,26 +212,26 @@ lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
           => Text -> [Text] -> m ()
 lpaddData name constructors = do
   lpassume name (Inf Star)
-  modify @"poly" (\(out, ve, te) -> (out, coerce (Global name, VNamedTy name) : ve, te))
+  modify @"poly" (\(LangState out ve te) ->
+      LangState out (coerce (Global name, VNamedTy name) : ve) te)
   mapM_ (lpAddConstructor name) (zip constructors [0 .. ])
   pure ()
 
 lpAddConstructor :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
   => Text -> (Text, Int) -> m ()
 lpAddConstructor typeName (constructorName, tag) = do
-  modify @"poly" (\(out, ve, te) ->
-    (out, (Global constructorName, coerce (VNamedCon constructorName tag)) : ve,
-          (Global constructorName, coerce (VNamedTy typeName)) : te))
+  modify @"poly" (\(LangState out ve te) -> LangState out
+    ((Global constructorName, coerce (VNamedCon constructorName tag)) : ve)
+    ((Global constructorName, coerce (VNamedTy typeName)) : te))
 
 lpassume
   :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
   => Text -> CTerm -> m ()
 lpassume x t = do
-  (out, ve, te) <- get @"poly"
-  check @MLTT' (tshow . cPrint 0 0 . quote0 . coerce) (out, ve, te) (coerce $ Ann t (Inf Star))
+  check @MLTT' (coerce $ Ann t (Inf Star))
         (\ (y, v) -> logStr (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))
-        (\ (y, v) -> (out, ve, (Global x, v) : te))
-  >>= put @"poly"
+        (\ (y, v) (LangState out ve te) -> (LangState out ve ((Global x, v) : te)))
+
 printNameContext :: NameEnv Value -> Text
 printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPrint 0 0 (quote0 ty)))
 
@@ -244,9 +248,9 @@ newtype MLTT' (x :: LangTerm) = MLTT' (MLTT x)
 instance Interpreter MLTT' where
   iname = "lambda-Pi"
   iprompt = "LP> "
-  iitype = \ v c i -> coerce (iType False 0 (coerce v, coerce c) (coerce i))
+  iitype = \ i -> do (LangState _ v c) <- ask @"poly"; pure (coerce (iType False 0 (coerce v, coerce c) (coerce i)))
   iquote = coerce . quote0 . coerce
-  ieval = \ e x -> coerce (iEval False (coerce e, []) (coerce x))
+  ieval = \ x -> do ctx <- ask @"values"; pure (coerce (iEval False (coerce ctx, []) (coerce x)))
   ihastype = id
   icprint = cPrint 0 0 . coerce
   itprint = cPrint 0 0 . quote0 . coerce
@@ -260,7 +264,7 @@ checkSimple :: (HasState "poly" PolyEngine m)
             -> ((Value, Value) -> PolyEngine)
             -> m ()
 checkSimple term updateState = do
-  (out, oldValueContext, oldTypeContext) <- get @"poly"
+  (LangState out oldValueContext oldTypeContext) <- get @"poly"
   --  typecheck and evaluate
   let x = iType False 0 (coerce oldValueContext, coerce oldTypeContext) term
   case x of
@@ -275,15 +279,15 @@ checkPure :: PolyEngine
           -> ITerm
           -> ((Value, Value) -> PolyEngine)
           -> Either Text PolyEngine
-checkPure state@(out, ve, te) t k =do
+checkPure state@(LangState out ve te) t k =do
   -- i: Text, t: Type
   --  typecheck and evaluate
   x <- iType False 0 (coerce te, coerce ve) t
   let v = iEval False (coerce ve, []) t
   return (k (x, v))
 
-initialContext :: (Text, Ctx Value, Ctx Value)
-initialContext = (mempty, coerce lpve, coerce lpte)
+initialContext :: PolyEngine
+initialContext = LangState mempty (coerce lpve) (coerce lpte)
 
 data LogAndStateCtx = LogAndStateCtx
   { logCtx :: LogCtx
