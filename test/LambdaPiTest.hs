@@ -91,7 +91,22 @@ syntaxTests = testGroup "syntax tests"
 -- tests about polynomial functors
 polyTests :: TestTree
 polyTests = testGroup "poly tests"
-  [
+  [ testCase "Nat Fin Poly" $
+    commandStr "let natFin = MkPoly Nat Fin"
+    `eqErrOutput` []
+  , testCase "Custom types Poly" $
+    commandStrs [
+      "data Three = Yes | No | Unknown",
+      "let polyThree = MkPoly Bool (\\_ -> Three)"]
+
+    `eqErrOutput` []
+  , testCase "parallel composition Poly" $
+    commandStrs [
+      "data Three = Yes | No | Unknown",
+      "let polyThree = MkPoly Bool (\\_ -> Three)",
+      ":load stdlib.lp",
+      "parallel polyThree polyThree"]
+    `eqErrOutput` []
   ]
 
 -- test that should give and error
