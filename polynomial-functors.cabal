@@ -34,6 +34,7 @@ library
     , capability
     , extra
     , generic-lens
+    , aeson
 
   extensions: LambdaCase, OverloadedStrings, TupleSections
   ghc-options: -fwarn-incomplete-patterns
@@ -53,6 +54,7 @@ executable lp
       , capability
       , extra
       , generic-lens
+      , aeson
     extensions: LambdaCase, OverloadedStrings, TupleSections
     other-modules:
         LambdaPi.Common
