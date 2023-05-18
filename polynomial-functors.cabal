@@ -22,6 +22,8 @@ library
         LambdaPi.Quote
         Effect.Logger
         Debug.Utils
+        Data.Graph.JSON
+        Data.Graph.Conversion
 
   build-depends:
       base >=4.9.1.0

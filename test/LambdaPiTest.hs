@@ -28,6 +28,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Utils
+import JSON
 
 -- test from top-level syntax
 syntaxTests :: TestTree
@@ -200,6 +201,7 @@ tests = testGroup "REPL tests"
   , cmdTests
   , errorTests
   , polyTests
+  , jsonTests
   ]
 
 main :: IO ()
