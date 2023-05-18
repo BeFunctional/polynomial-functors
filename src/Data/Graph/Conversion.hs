@@ -23,3 +23,9 @@ convertPolyNode _ _ = Nothing
 
 convertPolyGraph :: Text -> Value -> Graphical
 convertPolyGraph termName poly = Graphical (maybeToList $ convertPolyNode termName poly) []
+
+convertListNode :: [(Text, Value)] -> [Node]
+convertListNode = catMaybes . fmap (uncurry convertPolyNode )
+
+convertListGraph :: [(Text, Value)] -> Graphical
+convertListGraph = flip Graphical [] . convertListNode
