@@ -25,6 +25,7 @@ import Effect.Logger
 import Control.Monad.Except
 --import Control.Monad.Writer.Class
 
+import Data.Aeson (encode)
 import Data.List as LS
 import Data.Char
 import Data.Functor.Identity
@@ -32,6 +33,9 @@ import Data.Generics.Product
 import Data.Text as T
 import Data.Text.IO as T
 import Data.Kind (Type)
+import Data.Graph.Conversion
+import Data.Graph.JSON
+
 import Text.PrettyPrint.HughesPJ hiding (parens, render, text, (<>), char)
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Text.ParserCombinators.Parsec hiding (parse, State)
@@ -45,11 +49,13 @@ import System.IO.Error
 import GHC.Generics (Generic)
 
 import LambdaPi.Common
+import LambdaPi.AST (Value(VMkPoly))
 
 data Command
    = TypeOf Text
    | Compile CompileForm
    | Browse
+   | PolyCtx
    | Quit
    | Help
    | Noop
@@ -124,6 +130,7 @@ commands :: [InteractiveCommand]
 commands
   =  [ Cmd [":type"]        "<expr>"  TypeOf         "print type of expression",
        Cmd [":browse"]      ""        (const Browse) "browse names in scope",
+       Cmd [":ctx"]         ""        (const PolyCtx) "convert the polynomials into their graphical representation in JSON",
        Cmd [":load"]        "<file>"  (Compile . CompileFile)
                                                      "load program from file",
        Cmd [":quit"]        ""        (const Quit)   "exit interpreter",
@@ -218,6 +225,14 @@ interpretCommand x
      else
        return (Compile (CompileInteractive x))
 
+getPolyFromContext
+    :: forall f
+     . [(Name, f 'Val)]
+    -> Graphical
+getPolyFromContext values =
+  let polyNames = [(s, VMkPoly a b) | (Global s, VMkPoly a b) <- values]
+  in convertListGraph polyNames
+
 data Feedback = Continue | Abort
 
 handleCommand
@@ -241,6 +256,9 @@ handleCommand cmd = do
                  (\u -> logStr (render (itprint u)))
                  t
            return Continue
+       PolyCtx -> do ctx <- getPolyFromContext ve
+                     logStr (tshow $ encode ctx)
+                     return Continue
        Browse ->  do logIn (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
                      return Continue
        Compile c -> do
