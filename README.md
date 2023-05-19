@@ -63,21 +63,25 @@ of the morphism and the interface is given by the domain.
 
 There are three ways of interacting with the _Poly-Engine_:
 
-- Write a file and have it compiled and executed
+- Compile a file
 - Run a REPL
 - Import the engine as a library
 
-### Execute a file
+### Compile a file
 
 ```bash
 cabal run lp -- file.lp
 ```
 
+This will compile the file, import all the definitions and start an interactive session.
+
 ### Run as REPL
 
 ```bash
-cabal run repl
+cabal run lp
 ```
+
+This will run the repl without any definitions
 
 ### Import as library
 
@@ -114,22 +118,57 @@ monad stacks. Chose the monad stack to use and run the engine within it.
 
 A good first example of a Polynomial is what `x` represents, to be perfectly explicit, it's `1 * x ^ 1`.
 In the poly engine we create a new polynomial by calling the constructor `MkPoly` and providing it two
-arguments, in this case the unit type. `MkPoly MkUnit (\_ -> Unit)`.
+arguments, in this case the unit type. The Poly-Engine doesn't have a unit-type but we can create one:
+
+```
+> data Unit = MkUnit
+Unit :: *
+> let u = MkPoly Unit (\_ -> Unit)
+u :: [Poly]
+```
 
 The second argument is a lambda because it is _indexed_ over the first argument, in that case we need to
 write a function `Unit -> Type` but because we always return unit no matter what, we simply ignore the
 argument.
 
+This creates the polynomial `x`.
+
 ### Combining polys
 
-The Poly-Engine has the ability to combine multiple polynomials
+The Poly-Engine has the ability to combine multiple polynomials using the `parallel`, `multiplication`, and
+`choice` functions from `stdlib.lp`. Using the unit polynomial from above and the `poly1` value from
+stdlib we can build bigger expressions. `poly1` is defined as `MkPoly Nat Fin`. The library also has `poly2`
+defined as `MkPoly Nat (Vect Nat)`. To familiarize yourself with the monoidal operations on poly, try the 
+following:
 
-### Building real examples
+```
+> choice u poly1
+> parallel u u
+> multiplication poly1 poly2
+```
+
+You will notice the resulting terms are quite large and hard to read, this is due to two things:
+- basic data types like pairs are encoded with their more generic `Sigma` variant which introduces some noise.
+- In general printing lambda is a bit fraught. If we ignore the arugment we could chose to print only the body
+  but then two terms with the same type will have different printed strings if they have different implementations.
+
+### Building dynamical systems
+
+A typical example of a dynamical system is one that increments a number. In that case the interface is `(Unit , Nat)`
+we represent this with the poly `let api = MkPoly Nat (\_ -> Unit)` the state will be a natural number so we represent it as
+`let state = MkUnit Nat (\_ -> Nat)`
+
+/!\ unimplemented
+The full interactive system would be defined as the morphism between `state` and `api`.
 
 ### The standard library
 
 The file `stdlib.lp` provides a good demonstration of the engine by implementing a lot of the code
 datastructures. In particular it defines the three operators above and also demonstrates that we
-can create more as necessary.
+can create more as necessary. 
+
+```
+cabal run lp -- stdlib.lp
+```
 
 
