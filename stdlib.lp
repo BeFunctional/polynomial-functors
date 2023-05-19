@@ -76,3 +76,15 @@ let choice = (\p1 p2 ->
               p2)
             p1) :: Poly -> Poly -> Poly
 
+let compose = (\p1 p2 ->
+   polyElim (\_ -> Poly)
+            (\shp1 pos1 -> polyElim
+              (\_ -> Poly)
+              (\shp2 pos2 ->
+                MkPoly (Sigma shp1 (\x -> (pos1 x -> shp2)))
+                       (sigElim shp1 (\x -> (pos1 x -> shp2))
+                                     (\_ -> Type)
+                                     (\p1 p2 -> Sigma (pos1 p1) (\y -> pos2 (p2 y)))))
+              p2)
+            p1) :: Poly -> Poly -> Poly
+

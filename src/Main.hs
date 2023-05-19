@@ -7,7 +7,7 @@ import Data.Text (pack)
 
 main :: IO ()
 main = do
-  (_ : args) <- getArgs
+  (args) <- getArgs
   case args of
     [stdlib] -> runInteractive (pack stdlib)
     _ -> repLP
