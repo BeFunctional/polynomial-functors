@@ -2,6 +2,8 @@ module JSON where
 
 import Test.Tasty
 import Test.Tasty.HUnit
+import Data.Aeson (encode)
+import Data.Text (pack)
 import Data.Graph.JSON
 import Data.Graph.Conversion
 import LambdaPi.AST
@@ -13,14 +15,20 @@ jsonTests = testGroup "test json serialisation"
     convertPolyGraph "test" (VMkPoly VNat (VLam (const VNat)))
     @?=
     Graphical [Node "test" ["Nat"] ["Nat"]] []
-  , testCase "parallel composition" $
+  , testCase "get empty context" $
     commandStrs [ "data Unit = MkUnit"
                 , ":ctx"
                 ]
     `eqOutput`
     ["Unit :: *"
-    , "[]"
+    , "\"[]\""
     ]
+  , testCase "non-empty context" $
+    commandStrs [":l stdlib.lp"
+                , ":ctx"
+                ]
+    `eqLastOutput`
+    pack (show (encode [Graphical [Node "poly2" ["Nat"] ["\\ x -> Vec Nat x"]] [], Graphical [Node "poly1" ["Nat"] ["\\ x -> Fin x"]][]]))
   ]
 
 dataTest :: TestTree

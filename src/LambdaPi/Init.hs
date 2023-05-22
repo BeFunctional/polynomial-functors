@@ -26,6 +26,8 @@ import Data.Coerce
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.IORef
 import Data.List (find)
+import Data.Graph.JSON
+import Data.Graph.Conversion
 
 import GHC.Generics
 
@@ -258,6 +260,8 @@ instance Interpreter MLTT' where
   isparse = fmap coerce (parseStmt [])
   iassume (x, t) = lpassume x (coerce t)
   iaddData = lpaddData
+  ipolyCtx = do LangState _ ve _ <- get @"poly"
+                pure ([(name, coerce (VMkPoly pos dir)) | (Global name, VMkPoly pos dir) <- coerce ve])
 
 checkSimple :: (HasState "poly" PolyEngine m)
             => ITerm
@@ -313,8 +317,8 @@ runMain init (MainM program) = do
   runReaderT program (LogAndStateCtx printStdOut st)
 
 repLP :: IO ()
-repLP = runMain (coerce initialContext) $ readevalprint @MLTT' Nothing
+repLP = runMain (coerce initialContext) $ readevalprint @MLTT' (coerce $ uncurry convertPolyGraph) Nothing
 
 runInteractive :: Text -> IO ()
-runInteractive stdlib = runMain (coerce initialContext) $ readevalprint @MLTT' (Just stdlib)
+runInteractive stdlib = runMain (coerce initialContext) $ readevalprint @MLTT' (coerce $ uncurry convertPolyGraph) (Just stdlib)
 

@@ -139,17 +139,17 @@ cmdTests :: TestTree
 cmdTests = testGroup "command tests" $
 
   [ testCase "Type Nat" $
-    void (handleCommand @MLTT' (TypeOf "Nat"))
+    void (handleCommand @MLTT' undefined (TypeOf "Nat"))
     `eqOutput`
     ["*"]
 
   , testCase "browse" $
-    void (handleCommand @MLTT' Browse)
+    void (handleCommand @MLTT' undefined Browse)
     `eqOutput`
     ["finElim\nFin\nFSucc\nFZero\nif\nFalse\nTrue\nBool\neqElim\nEq\nRefl\nvecElim\nVec\nCons\nNil\nsigElim\nMkSigma\nSigma\npolyElim\nMkPoly\nPoly\nType\nnatElim\nNat\nSucc\nZero\n"]
 
   , testCase "stdlib import" $
-    void (handleCommand @MLTT' (Compile (CompileFile "stdlib.lp")))
+    void (handleCommand @MLTT' undefined (Compile (CompileFile "stdlib.lp")))
     `eqErrOutput`
     []
   ]

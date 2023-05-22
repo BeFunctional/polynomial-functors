@@ -49,7 +49,6 @@ import System.IO.Error
 import GHC.Generics (Generic)
 
 import LambdaPi.Common
-import LambdaPi.AST (Value(VMkPoly))
 
 data Command
    = TypeOf Text
@@ -69,8 +68,11 @@ data InteractiveCommand = Cmd [Text] Text (Text -> Command) Text
 type Ctx inf = [(Name, inf)]
 data LangState v inf = LangState
   { out :: Text
-  , valCtx :: NameEnv v
-  , tyCtx :: Ctx inf
+  , valCtx :: NameEnv v -- < Context of values
+  , tyCtx :: Ctx inf    -- < Context of types
+                        -- Unless there are postulates, the two should be
+                        -- the same length. Postulates only add to the
+                        -- value context
   }
   deriving (Show, Eq, Generic)
 
@@ -94,7 +96,6 @@ data LangTerm
    | Checkable
    | Val
 
-
 class Interpreter (c :: LangTerm -> *) where
   iname    :: Text
   iprompt  :: Text
@@ -112,6 +113,9 @@ class Interpreter (c :: LangTerm -> *) where
            => (Text, (c Checkable)) -> m ()
   iaddData :: Logger m => HasState "poly" (LangState (c Val) (c Val)) m
            => Text -> [Text] -> m ()
+  -- Returns all the poly in context with their first and second component as well as their name
+  ipolyCtx :: HasState "poly" (LangState (c Val) (c Val)) m
+           => m [(Text, c Val)]
 
 helpTxt :: [InteractiveCommand] -> Text
 helpTxt cs
@@ -175,8 +179,8 @@ readevalprint :: forall f m. Logger  m
               => HasState "poly" (LangState (f Val) (f Val)) m
               => MonadIO m
               => Interpreter f
-              => Maybe Text -> m ()
-readevalprint stdlib =
+              => ((Text, f 'Val) -> Graphical) -> Maybe Text -> m ()
+readevalprint encodeData stdlib =
   let rec :: m ()
       rec =
         do
@@ -189,7 +193,7 @@ readevalprint stdlib =
             Just "" -> rec
             Just x  -> do
                 c <- interpretCommand x
-                state' <- handleCommand c
+                state' <- handleCommand encodeData c
                 case state' of
                   Abort -> return ()
                   Continue -> rec
@@ -203,7 +207,7 @@ readevalprint stdlib =
            Nothing -> rec
            Just lib -> do
              state <- get @"poly"
-             state' <- handleCommand (Compile $ CompileFile lib)
+             state' <- handleCommand encodeData (Compile $ CompileFile lib)
              case state' of
                Abort -> return ()
                Continue -> rec
@@ -225,22 +229,15 @@ interpretCommand x
      else
        return (Compile (CompileInteractive x))
 
-getPolyFromContext
-    :: forall f
-     . [(Name, f 'Val)]
-    -> Graphical
-getPolyFromContext values =
-  let polyNames = [(s, VMkPoly a b) | (Global s, VMkPoly a b) <- values]
-  in convertListGraph polyNames
-
 data Feedback = Continue | Abort
 
 handleCommand
     :: forall f m. (Logger m, MonadIO m)
     => HasState "poly" (LangState (f Val) (f Val)) m
     => Interpreter f
-    => Command -> m Feedback
-handleCommand cmd = do
+    => ((Text, f Val) -> Graphical)
+    -> Command -> m Feedback
+handleCommand encodeData cmd = do
     (LangState out ve te) <- get @"poly"
     case cmd of
        Quit   ->  (logStr "!@#$^&*") >> return Abort
@@ -256,8 +253,8 @@ handleCommand cmd = do
                  (\u -> logStr (render (itprint u)))
                  t
            return Continue
-       PolyCtx -> do ctx <- getPolyFromContext ve
-                     logStr (tshow $ encode ctx)
+       PolyCtx -> do ctx <- ipolyCtx
+                     logStr (tshow $ encode (fmap encodeData ctx))
                      return Continue
        Browse ->  do logIn (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
                      return Continue

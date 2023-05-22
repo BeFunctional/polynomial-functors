@@ -81,6 +81,7 @@ test-suite polynomial-functors-test
   other-modules:
       Utils
   build-depends:
+    , aeson
     , base            ^>=4.12
     , text
     , hedgehog
