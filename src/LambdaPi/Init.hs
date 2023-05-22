@@ -158,8 +158,6 @@ lpte =      [(Global "Zero", VNat),
                                 VPi VNat (\ n -> VPi (VFin n) (\ f ->
                                 m `vapp` n `vapp` f))))))]
 
-data FullContext = FullContext { types :: Ctx Value, values :: Ctx Value }
-
 lpve :: Ctx Value
 lpve =      [(Global "Zero", VZero),
              (Global "Succ", VLam (\ n -> VSucc n)),
@@ -262,6 +260,11 @@ instance Interpreter MLTT' where
   iaddData = lpaddData
   ipolyCtx = do LangState _ ve _ <- get @"poly"
                 pure ([(name, coerce (VMkPoly pos dir)) | (Global name, VMkPoly pos dir) <- coerce ve])
+
+getPolyCtx :: HasState "poly" PolyState m => m [Graphical]
+getPolyCtx = do polys <- ipolyCtx
+                let mapPolyToGraph = coerce (uncurry convertPolyGraph)
+                pure (fmap mapPolyToGraph polys)
 
 checkSimple :: (HasState "poly" PolyEngine m)
             => ITerm
