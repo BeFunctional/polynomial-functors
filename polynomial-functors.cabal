@@ -22,6 +22,8 @@ library
         LambdaPi.Quote
         Effect.Logger
         Debug.Utils
+        Data.Graph.JSON
+        Data.Graph.Conversion
 
   build-depends:
       base >=4.9.1.0
@@ -34,6 +36,7 @@ library
     , capability
     , extra
     , generic-lens
+    , aeson
 
   extensions: LambdaCase, OverloadedStrings, TupleSections
   ghc-options: -fwarn-incomplete-patterns
@@ -53,6 +56,7 @@ executable lp
       , capability
       , extra
       , generic-lens
+      , aeson
     extensions: LambdaCase, OverloadedStrings, TupleSections
     other-modules:
         LambdaPi.Common
@@ -77,6 +81,7 @@ test-suite polynomial-functors-test
   other-modules:
       Utils
   build-depends:
+    , aeson
     , base            ^>=4.12
     , text
     , hedgehog

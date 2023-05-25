@@ -26,6 +26,8 @@ import Data.Coerce
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.IORef
 import Data.List (find)
+import Data.Graph.JSON
+import Data.Graph.Conversion
 
 import GHC.Generics
 
@@ -156,8 +158,6 @@ lpte =      [(Global "Zero", VNat),
                                 VPi VNat (\ n -> VPi (VFin n) (\ f ->
                                 m `vapp` n `vapp` f))))))]
 
-data FullContext = FullContext { types :: Ctx Value, values :: Ctx Value }
-
 lpve :: Ctx Value
 lpve =      [(Global "Zero", VZero),
              (Global "Succ", VLam (\ n -> VSucc n)),
@@ -258,6 +258,13 @@ instance Interpreter MLTT' where
   isparse = fmap coerce (parseStmt [])
   iassume (x, t) = lpassume x (coerce t)
   iaddData = lpaddData
+  ipolyCtx = do LangState _ ve _ <- get @"poly"
+                pure ([(name, coerce (VMkPoly pos dir)) | (Global name, VMkPoly pos dir) <- coerce ve])
+
+getPolyCtx :: HasState "poly" PolyState m => m [Graphical]
+getPolyCtx = do polys <- ipolyCtx
+                let mapPolyToGraph = coerce (uncurry convertPolyGraph)
+                pure (fmap mapPolyToGraph polys)
 
 checkSimple :: (HasState "poly" PolyEngine m)
             => ITerm
@@ -313,8 +320,8 @@ runMain init (MainM program) = do
   runReaderT program (LogAndStateCtx printStdOut st)
 
 repLP :: IO ()
-repLP = runMain (coerce initialContext) $ readevalprint @MLTT' Nothing
+repLP = runMain (coerce initialContext) $ readevalprint @MLTT' (coerce $ uncurry convertPolyGraph) Nothing
 
 runInteractive :: Text -> IO ()
-runInteractive stdlib = runMain (coerce initialContext) $ readevalprint @MLTT' (Just stdlib)
+runInteractive stdlib = runMain (coerce initialContext) $ readevalprint @MLTT' (coerce $ uncurry convertPolyGraph) (Just stdlib)
 

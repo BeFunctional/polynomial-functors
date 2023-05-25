@@ -25,6 +25,7 @@ import Effect.Logger
 import Control.Monad.Except
 --import Control.Monad.Writer.Class
 
+import Data.Aeson (encode)
 import Data.List as LS
 import Data.Char
 import Data.Functor.Identity
@@ -32,6 +33,9 @@ import Data.Generics.Product
 import Data.Text as T
 import Data.Text.IO as T
 import Data.Kind (Type)
+import Data.Graph.Conversion
+import Data.Graph.JSON
+
 import Text.PrettyPrint.HughesPJ hiding (parens, render, text, (<>), char)
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Text.ParserCombinators.Parsec hiding (parse, State)
@@ -50,6 +54,7 @@ data Command
    = TypeOf Text
    | Compile CompileForm
    | Browse
+   | PolyCtx
    | Quit
    | Help
    | Noop
@@ -63,8 +68,11 @@ data InteractiveCommand = Cmd [Text] Text (Text -> Command) Text
 type Ctx inf = [(Name, inf)]
 data LangState v inf = LangState
   { out :: Text
-  , valCtx :: NameEnv v
-  , tyCtx :: Ctx inf
+  , valCtx :: NameEnv v -- < Context of values
+  , tyCtx :: Ctx inf    -- < Context of types
+                        -- Unless there are postulates, the two should be
+                        -- the same length. Postulates only add to the
+                        -- value context
   }
   deriving (Show, Eq, Generic)
 
@@ -88,7 +96,6 @@ data LangTerm
    | Checkable
    | Val
 
-
 class Interpreter (c :: LangTerm -> *) where
   iname    :: Text
   iprompt  :: Text
@@ -106,6 +113,9 @@ class Interpreter (c :: LangTerm -> *) where
            => (Text, (c Checkable)) -> m ()
   iaddData :: Logger m => HasState "poly" (LangState (c Val) (c Val)) m
            => Text -> [Text] -> m ()
+  -- Returns all the poly in context with their first and second component as well as their name
+  ipolyCtx :: HasState "poly" (LangState (c Val) (c Val)) m
+           => m [(Text, c Val)]
 
 helpTxt :: [InteractiveCommand] -> Text
 helpTxt cs
@@ -124,6 +134,7 @@ commands :: [InteractiveCommand]
 commands
   =  [ Cmd [":type"]        "<expr>"  TypeOf         "print type of expression",
        Cmd [":browse"]      ""        (const Browse) "browse names in scope",
+       Cmd [":ctx"]         ""        (const PolyCtx) "convert the polynomials into their graphical representation in JSON",
        Cmd [":load"]        "<file>"  (Compile . CompileFile)
                                                      "load program from file",
        Cmd [":quit"]        ""        (const Quit)   "exit interpreter",
@@ -168,8 +179,8 @@ readevalprint :: forall f m. Logger  m
               => HasState "poly" (LangState (f Val) (f Val)) m
               => MonadIO m
               => Interpreter f
-              => Maybe Text -> m ()
-readevalprint stdlib =
+              => ((Text, f 'Val) -> Graphical) -> Maybe Text -> m ()
+readevalprint encodeData stdlib =
   let rec :: m ()
       rec =
         do
@@ -182,7 +193,7 @@ readevalprint stdlib =
             Just "" -> rec
             Just x  -> do
                 c <- interpretCommand x
-                state' <- handleCommand c
+                state' <- handleCommand encodeData c
                 case state' of
                   Abort -> return ()
                   Continue -> rec
@@ -196,7 +207,7 @@ readevalprint stdlib =
            Nothing -> rec
            Just lib -> do
              state <- get @"poly"
-             state' <- handleCommand (Compile $ CompileFile lib)
+             state' <- handleCommand encodeData (Compile $ CompileFile lib)
              case state' of
                Abort -> return ()
                Continue -> rec
@@ -224,8 +235,9 @@ handleCommand
     :: forall f m. (Logger m, MonadIO m)
     => HasState "poly" (LangState (f Val) (f Val)) m
     => Interpreter f
-    => Command -> m Feedback
-handleCommand cmd = do
+    => ((Text, f Val) -> Graphical)
+    -> Command -> m Feedback
+handleCommand encodeData cmd = do
     (LangState out ve te) <- get @"poly"
     case cmd of
        Quit   ->  (logStr "!@#$^&*") >> return Abort
@@ -241,6 +253,9 @@ handleCommand cmd = do
                  (\u -> logStr (render (itprint u)))
                  t
            return Continue
+       PolyCtx -> do ctx <- ipolyCtx
+                     logStr (tshow $ encode (fmap encodeData ctx))
+                     return Continue
        Browse ->  do logIn (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
                      return Continue
        Compile c -> do

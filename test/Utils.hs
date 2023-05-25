@@ -19,6 +19,7 @@ import Control.Monad.IO.Class (MonadIO)
 import Data.Text (Text)
 import Data.IORef
 import Data.Coerce
+import Data.Graph.Conversion
 
 import Effect.Logger
 
@@ -83,7 +84,7 @@ commandStr :: (MonadIO m, HasState "poly" PolyState m, Logger m)
            => Text -> m ()
 commandStr cmd = do
   parsedCommand <- interpretCommand cmd
-  result <- handleCommand @MLTT' parsedCommand
+  result <- handleCommand @MLTT' (coerce $ uncurry convertPolyGraph) parsedCommand
   return ()
 
 -- check if the final state and the std output are the ones expected
@@ -97,6 +98,11 @@ eqOutput :: TestM () -> [Text] -> Assertion
 eqOutput op printedExpected = do
   (_, _, printedActual, errors) <- runTest' initialContext op
   printedActual @?= printedExpected
+
+eqLastOutput :: TestM () -> Text -> Assertion
+eqLastOutput op printedExpected = do
+  (_, _, printedActual, errors) <- runTest' initialContext op
+  last printedActual @?= printedExpected
 
 eqOutErr :: TestM () -> [Text] -> [Text] -> Assertion
 eqOutErr op printedExpected errorsExpected = do
