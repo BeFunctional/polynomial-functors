@@ -194,6 +194,50 @@ stmtTests = testGroup "statement tests" $
       , (Global "K3", VStar)])
   ]
 
+moContract :: TestTree
+moContract = testGroup "tests from Much Obliged contract translation" $
+  [ testCase "test permissions" $
+      commandStrs
+        [ "let Entity = Nat"
+        , "data Bool = True | False"
+        , "let Permission = Bool"
+        , "let permissionContract = MkPoly Bool (\\_ -> Sigma Entity (\\_ -> Permission)) :: Poly"
+        ]
+      `eqOutput`
+      [ "Entity :: *"
+      , "Bool :: *"
+      , "Permission :: *"
+      , "permissionContract :: [Poly]"
+      ]
+  , testCase "test effects" $
+      commandStrs
+        [ "data Effect = Grant | Revoke"
+        , "let Entity = Nat"
+        , "let Permission = Nat"
+        , "let effectContract = MkPoly Effect (\\_ -> Sigma Entity (\\_ ->Permission))"
+        ]
+      `eqOutput`
+      [ "Effect :: *"
+      , "Entity :: *"
+      , "Permission :: *"
+      , "effectContract :: [Poly]"
+      ]
+  , testCase "test composite" $
+      commandStrs
+        [ ":l stdlib.lp"
+        , "let Entity = Nat"
+        , "data Unit = MkUnit"
+        , "let grant = MkPoly Unit (\\_ -> Entity)"
+        , "let revoke = MkPoly Unit (\\_ -> Entity)"
+        , "let check = MkPoly (Pair Entity Entity) (\\_ -> Entity)"
+        , "let system = compose check (choice grant revoke) :: Poly"
+        ]
+      `eqErrOutput`
+        []
+
+
+  ]
+
 tests :: TestTree
 tests = testGroup "REPL tests"
   [ syntaxTests
@@ -202,6 +246,7 @@ tests = testGroup "REPL tests"
   , errorTests
   , polyTests
   , jsonTests
+  , moContract
   ]
 
 main :: IO ()
