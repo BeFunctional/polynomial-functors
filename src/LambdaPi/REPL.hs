@@ -280,7 +280,6 @@ compileFile f =
 compilePhrase
     :: Logger m
     => HasState "poly" (LangState (f Val) (f Val)) m
-    => MonadIO m
     => Interpreter f
     => Text -> m ()
 compilePhrase input = do
@@ -301,7 +300,6 @@ iinfer t = do
 
 handleStmt :: forall f m. Logger m
            => HasState "poly" (LangState (f Val) (f Val)) m
-           => MonadIO m
            => Interpreter f
            => Stmt (f Inferrable) (f Checkable)
            -> m ()
@@ -326,8 +324,8 @@ handleStmt stmt = do
           let outtext = if i == it
               then render (icprint (iquote v) PP.<> text " :: " PP.<> itprint y)
               else render (text i PP.<> text " :: " PP.<> itprint y)
-          logStr outtext
-          unless (T.null out) (liftIO $ writeFile (unpack out) (process outtext)))
+          logStr outtext)
+          -- unless (T.null out) (liftIO $ writeFile (unpack out) (process outtext)))
         (\ (y, v) (LangState out ve te) -> (LangState ""
             ((Global i, v) : ve)
             ((Global i, ihastype y) : te))
