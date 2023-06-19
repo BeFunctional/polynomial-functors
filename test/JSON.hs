@@ -14,7 +14,7 @@ jsonTests = testGroup "test json serialisation"
   [ testCase "simple poly" $
     convertPolyGraph "test" (VMkPoly VNat (VLam (const VNat)))
     @?=
-    Graphical [Node "test" ["Nat"] ["Nat"]] []
+    Graphical [Node "test" [Arity "Nat"] [Arity "Nat"]] []
   , testCase "get empty context" $
     commandStrs [ "data Unit = MkUnit"
                 , ":ctx"
@@ -28,7 +28,8 @@ jsonTests = testGroup "test json serialisation"
                 , ":ctx"
                 ]
     `eqLastOutput`
-    pack (show (encode [Graphical [Node "poly2" ["Nat"] ["\\ x -> Vec Nat x"]] [], Graphical [Node "poly1" ["Nat"] ["\\ x -> Fin x"]][]]))
+    pack (show (encode [Graphical [Node "poly2" [Arity "Nat"] [Arity "\\ x -> Vec Nat x"]] [],
+                        Graphical [Node "poly1" [Arity "Nat"] [Arity "\\ x -> Fin x"]][]]))
   ]
 
 dataTest :: TestTree

@@ -17,8 +17,8 @@ convertPolyNode :: Text -> Value -> Maybe Node
 convertPolyNode termName (VMkPoly pos dir) =
       Just $ Node
           termName
-          [pack $ show $ cPrint 0 0 (quote0 pos)]
-          [pack $ show $ cPrint 0 0 (quote0 dir)]
+          [Arity $ pack $ show $ cPrint 0 0 (quote0 pos)]
+          [Arity $ pack $ show $ cPrint 0 0 (quote0 dir)]
 convertPolyNode _ _ = Nothing
 
 convertPolyGraph :: Text -> Value -> Graphical
