@@ -19,6 +19,7 @@ convertPolyNode termName (VMkPoly pos dir) =
           termName
           [Arity $ pack $ show $ cPrint 0 0 (quote0 pos)]
           [Arity $ pack $ show $ cPrint 0 0 (quote0 dir)]
+          Nothing
 convertPolyNode _ _ = Nothing
 
 convertPolyGraph :: Text -> Value -> Graphical

@@ -17,10 +17,18 @@ data Graphical = Graphical
   deriving (Eq, Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
 
+data LevelInfo = LevelInfo
+  { x :: Double,
+    y :: Double
+  }
+  deriving (Eq, Show, Generic)
+  deriving anyclass (FromJSON, ToJSON)
+
 data Node = Node
   { name :: Text,
     arity :: [Arity],
-    coarity :: [Arity]
+    coarity :: [Arity],
+    level :: Maybe LevelInfo
   }
   deriving (Eq, Show, Generic)
   deriving anyclass (FromJSON, ToJSON)
