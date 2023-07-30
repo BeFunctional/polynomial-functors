@@ -17,10 +17,11 @@ module Main (main) where
 import Control.Monad (void)
 
 import Data.Coerce (coerce)
+import qualified Data.Map as Map
 
 import LambdaPi.REPL (handleCommand, handleStmt, Command(..), CompileForm(..))
 import LambdaPi.Init hiding (main)
-import LambdaPi.Common (Name(..), Stmt(..))
+import LambdaPi.Common (ContextRow(..), Name(..), Stmt(..))
 import LambdaPi.AST
 import LambdaPi.Eval (cEval)
 
@@ -146,7 +147,7 @@ cmdTests = testGroup "command tests" $
   , testCase "browse" $
     void (handleCommand @MLTT' undefined Browse)
     `eqOutput`
-    ["finElim\nFin\nFSucc\nFZero\nif\nFalse\nTrue\nBool\neqElim\nEq\nRefl\nvecElim\nVec\nCons\nNil\nsigElim\nMkSigma\nSigma\npolyElim\nMkPoly\nPoly\nType\nnatElim\nNat\nSucc\nZero\n"]
+    ["Bool\nCons\nEq\nFSucc\nFZero\nFalse\nFin\nMkPoly\nMkSigma\nNat\nNil\nPoly\nRefl\nSigma\nSucc\nTrue\nType\nVec\nZero\neqElim\nfinElim\nif\nnatElim\npolyElim\nsigElim\nvecElim\n"]
 
   , testCase "stdlib import" $
     void (handleCommand @MLTT' undefined (Compile (CompileFile "stdlib.lp")))
@@ -166,32 +167,27 @@ stmtTests = testGroup "statement tests" $
   , testCase "test let id ctx" $
     void (handleStmt @MLTT' (coerce makeIdStmt))
     `eqContext`
-    ( [(Global "id", VLam (\x -> VLam (\y -> y)))]
-    , [(Global "id", VPi VStar (\x -> VPi x (\_ -> x)))])
+    Map.fromList
+      [(Global "id", UserDef (VPi VStar (\x -> VPi x (\_ -> x))) (VLam (\x -> VLam (\y -> y))))]
 
   , testCase "test data decl Bool" $
-    void (handleStmt @MLTT' (DataDecl "Bool" ["True", "False"]))
+    void (handleStmt @MLTT' (DataDecl "Bool2" ["True2", "False2"]))
     `eqContext`
-    ( [ (Global "False", VNamedCon "False" 1)
-      , (Global "True", VNamedCon "True" 0)
-      , (Global "Bool", VNamedTy "Bool")
-      ]
-    , [ (Global "False", VNamedTy "Bool")
-      , (Global "True", VNamedTy "Bool")
-      , (Global "Bool", VStar)])
+    ( Map.fromList
+      [ (Global "False2", UserDef (VNamedTy "Bool2") (VNamedCon "False2" 1))
+      , (Global "True2", UserDef (VNamedTy "Bool2") (VNamedCon "True2" 0))
+      , (Global "Bool2", UserDef VStar (VNamedTy "Bool2"))
+      ])
 
   , testCase "test data decl K3" $
     void (handleStmt @MLTT' (DataDecl "K3" ["Yes", "No", "Maybe"]))
     `eqContext`
-    ( [ (Global "Maybe", VNamedCon "Maybe" 2)
-      , (Global "No", VNamedCon "No" 1)
-      , (Global "Yes", VNamedCon "Yes" 0)
-      , (Global "K3", VNamedTy "K3")
-      ]
-    , [ (Global "Maybe", VNamedTy "K3")
-      , (Global "No", VNamedTy "K3")
-      , (Global "Yes", VNamedTy "K3")
-      , (Global "K3", VStar)])
+    ( Map.fromList
+      [ (Global "Maybe", UserDef (VNamedTy "K3") (VNamedCon "Maybe" 2))
+      , (Global "No",    UserDef (VNamedTy "K3") (VNamedCon "No" 1))
+      , (Global "Yes",   UserDef (VNamedTy "K3") (VNamedCon "Yes" 0))
+      , (Global "K3",    UserDef VStar           (VNamedTy "K3"))
+      ])
   ]
 
 moContract :: TestTree
@@ -234,8 +230,6 @@ moContract = testGroup "tests from Much Obliged contract translation" $
         ]
       `eqErrOutput`
         []
-
-
   ]
 
 tests :: TestTree

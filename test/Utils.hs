@@ -17,9 +17,11 @@ import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.IO.Class (MonadIO)
 
 import Data.Text (Text)
+import qualified Data.Map as Map
 import Data.IORef
 import Data.Coerce
 import Data.Graph.Conversion
+import qualified Data.Map as Map
 
 import Effect.Logger
 
@@ -116,8 +118,7 @@ eqErrOutput op expectedErrors = do
   (_, _, _, errors) <- runTest' initialContext op
   errors @?= expectedErrors
 
-eqContext :: TestM () -> ([(Name, Value)], [(Name, Value)]) -> Assertion
-eqContext op (expectedValues, expectedTypes) = do
-  (_, (LangState _ values types), _, _) <- runTest' initialContext op
-  reverse (drop (length lpve) (reverse values)) @?= expectedValues
-  reverse (drop (length lpte) (reverse types)) @?= expectedTypes
+eqContext :: TestM () -> Map.Map Name (ContextRow Value Value) -> Assertion
+eqContext op expectedContext = do
+  (_, (LangState _ ctx), _, _) <- runTest' initialContext op
+  (Map.difference ctx lpCtx) @?= expectedContext

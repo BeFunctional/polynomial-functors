@@ -9,7 +9,7 @@ import Data.Bifunctor (second)
 import Data.Maybe (fromJust)
 import Debug.Utils
 
-cEval :: Bool -> (NameEnv Value, Env) -> CTerm ->  Value
+cEval :: Bool -> ([(Name, Value)], Env) -> CTerm ->  Value
 cEval shouldTrace d (Inf  ii)           = traceIf shouldTrace ("eval Inf ") $ iEval shouldTrace d ii
 cEval shouldTrace d (Lam  c)            = traceIf shouldTrace "eval lam"
                                         $ VLam (\x -> cEval shouldTrace ((\(e, d) -> (e,  (x : d))) d)c )
@@ -42,7 +42,7 @@ cEval shouldTrace d (Comma t1 t2 v1 v2) = traceIf shouldTrace "eval comma"
 cEval shouldTrace d (NamedCon nm t)     = traceIf shouldTrace "eval named constructor"
                                         $ VNamedCon nm t
 
-iEval :: Bool -> (NameEnv Value,Env) -> ITerm -> Value
+iEval :: Bool -> ([(Name, Value)],Env) -> ITerm -> Value
 iEval shouldTrace d (Ann c _)     = traceIf shouldTrace "eval ann" $  cEval shouldTrace d c
 iEval shouldTrace d Star          = traceIf shouldTrace "eval star" $  VStar
 iEval shouldTrace d (Pi ty ty1)   = traceIf shouldTrace "eval pi"

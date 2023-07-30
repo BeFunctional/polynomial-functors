@@ -20,7 +20,7 @@ import LambdaPi.REPL
 
 import Prelude hiding (unlines, putStr)
 
-import Data.Text (Text, unlines)
+import Data.Text (Text, unlines, toLower)
 import Data.Text.IO (putStr)
 import Data.Coerce
 import Data.Maybe (fromMaybe, catMaybes)
@@ -28,6 +28,7 @@ import Data.IORef
 import Data.List (find)
 import Data.Graph.JSON
 import Data.Graph.Conversion
+import qualified Data.Map as Map
 
 import GHC.Generics
 
@@ -54,35 +55,59 @@ import Effect.Logger
 type PolyEngine = LangState Value Value
 type PolyState = LangState (MLTT' Val) (MLTT' Val)
 
-lpte :: Ctx Value
-lpte =      [(Global "Zero", VNat),
-             (Global "Succ", VPi VNat (\_ -> VNat)),
-             (Global "Nat", VStar),
-             (Global "natElim", VPi (VPi VNat (\_ -> VStar)) (\m ->
-                               VPi (m `vapp` VZero) (\_ ->
-                               VPi (VPi VNat (\ k -> VPi (m `vapp` k) (\_ -> (m `vapp` (VSucc k))))) (\_ ->
-                               VPi VNat (\ n -> m `vapp` n))))),
-             (Global "Type", VStar),
+lpCtx :: Ctx Value Value
+lpCtx = Map.fromList
+    [(Global "Zero", UserDef VNat VZero),
+     (Global "Succ", UserDef (VPi VNat (\_ -> VNat)) (VLam VSucc)),
+     (Global "Nat",  UserDef VStar VNat),
+     (Global "natElim", UserDef
+         (VPi (VPi VNat (\_ -> VStar)) (\m ->
+              VPi (m `vapp` VZero) (\_ ->
+              VPi (VPi VNat (\ k -> VPi (m `vapp` k) (\_ -> (m `vapp` (VSucc k))))) (\_ ->
+              VPi VNat (\ n -> m `vapp` n)))))
+         (cEval False ([],[]) $ Lam $ Lam $ Lam $ Lam $
+             (Inf (NatElim
+                 (Inf (Bound 3))
+                 (Inf (Bound 2))
+                 (Inf (Bound 1))
+                 (Inf (Bound 0)))))),
+     (Global "Type", UserDef VStar VStar),
              ------------------------------------------------------
              -- Polynomial things
              ------------------------------------------------------
-             (Global "Poly", VStar), -- Poly is a type
-             (Global "MkPoly", VPi VStar (\s -> VPi (VPi s (const VStar)) (const VPoly))),
-             (Global "polyElim", VPi (VPi VPoly (const VStar)) (\motive ->    -- motive
-                                 VPi (VPi VStar (\sh ->                       -- \
-                                       VPi (VPi sh (const VStar)) (\pos ->    --  -eliminator
-                                       motive `vapp` VMkPoly sh pos))) (\_ -> -- /
-                                 VPi VPoly (\c ->                             -- argument
-                                 motive `vapp` c)))),                         -- return type
+     (Global "Poly", UserDef VStar VPoly),
+     (Global "MkPoly", UserDef
+         (VPi VStar (\s -> VPi (VPi s (const VStar)) (const VPoly)))
+         (VLam (\ty -> VLam (\fy -> VMkPoly ty fy)))),
+     (Global "polyElim", UserDef
+         (VPi (VPi VPoly (const VStar)) (\motive ->    -- motive
+         VPi (VPi VStar (\sh ->                       -- \
+               VPi (VPi sh (const VStar)) (\pos ->    --  -eliminator
+               motive `vapp` VMkPoly sh pos))) (\_ -> -- /
+         VPi VPoly (\c ->                             -- argument
+         motive `vapp` c))))
+         (cEval False ([],[])
+                     (Lam $ Lam $ Lam $ Inf $
+                      PolyElim (Inf (Bound 2))
+                               (Inf (Bound 1))
+                               (Inf (Bound 0))
+                      ))),                         -- return type
              ------------------------------------------------------
              -- Sigma types
              ------------------------------------------------------
-             (Global "Sigma", VPi VStar (\x -> VPi (VPi x (const VStar)) (const VStar))),
-             (Global "MkSigma", VPi VStar                      (\fstTy -> VPi
-                                     (VPi fstTy (const VStar)) (\sndTy -> VPi
-                                     fstTy                     (\val1 -> VPi
-                                     (sndTy `vapp` val1)       (\val2 ->
-                                     VSigma fstTy sndTy))))),
+     (Global "Sigma", UserDef
+         (VPi VStar (\x -> VPi (VPi x (const VStar)) (const VStar))) -- type
+         (VLam (\a -> VLam (\b -> VSigma a b)))),                    -- value
+     (Global "MkSigma", UserDef
+         (VPi VStar                      (\fstTy -> VPi
+               (VPi fstTy (const VStar)) (\sndTy -> VPi
+               fstTy                     (\val1 -> VPi
+               (sndTy `vapp` val1)       (\val2 ->
+               VSigma fstTy sndTy)))))
+         (VLam (\a -> VLam
+               (\b -> VLam
+               (\v1 -> VLam
+               (\v2 -> VComma a b v1 v2)))))),
              -- z : Σ[x : A1] A2            x : A1, y : A2 ⊢ b : B(x, y)
              -- --------------------------------------------------------
              --     match z of (x, y) => b : B(z)
@@ -93,158 +118,211 @@ lpte =      [(Global "Zero", VNat),
              --           (i : (x : ty) -> (y : fy x) -> m (MkSigma x y))
              --           (s : Sigma ty fy)
              --           m s
-             (Global "sigElim", VPi VStar                               (\ty -> VPi
-                                     (VPi ty (const VStar))             (\fy -> VPi
-                                     (VPi (VSigma ty fy) (const VStar)) (\m -> VPi
-                                     (VPi ty            (\x ->
-                                      VPi (fy `vapp` x) (\y ->
-                                        m `vapp` VComma ty fy x y)))    (\i -> VPi
-                                     (VSigma ty fy)                     (\s ->
-                                     m `vapp` s)))))),
-             ------------------------------------------------------
-             -- List things
-             ------------------------------------------------------
-             (Global "Nil", VPi VStar (\ a -> VVec a VZero)),
-             (Global "Cons", VPi VStar (\ a ->
-                            VPi VNat (\ n ->
-                            VPi a (\_ -> VPi (VVec a n) (\_ -> VVec a (VSucc n)))))),
-             (Global "Vec", VPi VStar (\_ -> VPi VNat (\_ -> VStar))),
-             (Global "vecElim", VPi VStar (\ a ->
-                                VPi (VPi VNat (\ n -> VPi (VVec a n) (\_ -> VStar))) (\ m ->
-                                VPi (m `vapp` VZero `vapp` (VNil a)) (\_ ->
-                                VPi (VPi VNat (\ n ->
-                                     VPi a (\ x ->
-                                     VPi (VVec a n) (\ xs ->
-                                     VPi (m `vapp` n `vapp` xs) (\_ ->
-                                     m `vapp` VSucc n `vapp` VCons a n x xs))))) (\_ ->
-                                VPi VNat (\ n ->
-                                VPi (VVec a n) (\ xs -> m `vapp` n `vapp` xs))))))),
-             ------------------------------------------------------
-             -- Equality
-             ------------------------------------------------------
-             (Global "Refl", VPi VStar (\ a -> VPi a (\ x ->
-                            VEq a x x))),
-             (Global "Eq", VPi VStar (\ a -> VPi a (\ x -> VPi a (\y -> VStar)))),
-             (Global "eqElim", VPi VStar (\ a ->
-                              VPi (VPi a (\ x -> VPi a (\ y -> VPi (VEq a x y) (\_ -> VStar)))) (\m ->
-                              VPi (VPi a (\ x -> ((m `vapp` x) `vapp` x) `vapp` VRefl a x))     (\_ ->
-                              VPi a (\ x -> VPi a (\ y ->
-                              VPi (VEq a x y) (\ eq ->
-                              ((m `vapp` x) `vapp` y) `vapp` eq))))))),
-             ------------------------------------------------------
-             -- Bool things
-             ------------------------------------------------------
-             (Global "Bool", VStar),
-             (Global "True", VNamedTy "Bool"),
-             (Global "False", VNamedTy "Bool"),
-             (Global "if", (VPi (VPi (VNamedTy "Bool") (const VStar)) (\m -> VPi
-                                (m `vapp` (VNamedCon "True" 1)) (\th -> VPi
-                                (m `vapp` (VNamedCon "False" 0)) (\el -> VPi
-                                (VNamedTy "Bool") (\b ->
-                                m `vapp` b)))))),
-             ------------------------------------------------------
-             -- Finite things
-             ------------------------------------------------------
-             (Global "FZero", VPi VNat (\ n -> VFin (VSucc n))),
-             (Global "FSucc", VPi VNat (\ n -> VPi (VFin n) (\ f ->
-                              VFin (VSucc n)))),
-             (Global "Fin", VPi VNat (\ n -> VStar)),
-             (Global "finElim", VPi (VPi VNat (\ n -> VPi (VFin n) (\_ -> VStar))) (\ m ->
-                                VPi (VPi VNat (\ n -> m `vapp` (VSucc n) `vapp` (VFZero n))) (\_ ->
-                                VPi (VPi VNat                  (\n ->
-                                     VPi (VFin n)              (\f ->
-                                     VPi (m `vapp` n `vapp` f) (\_ ->
-                                     m `vapp` VSucc n `vapp` VFSucc n f)))) (\_ ->
-                                VPi VNat (\ n -> VPi (VFin n) (\ f ->
-                                m `vapp` n `vapp` f))))))]
-
-lpve :: Ctx Value
-lpve =      [(Global "Zero", VZero),
-             (Global "Succ", VLam (\ n -> VSucc n)),
-             (Global "Nat", VNat),
-             (Global "natElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Inf (NatElim (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0)))))))) ),
-             (Global "Type", VStar),
-             (Global "Poly", VPoly), -- The value for the type Poly
-             (Global "MkPoly", VLam (\ty -> VLam (\fy -> VMkPoly ty fy))), -- poly constructor
-             (Global "polyElim",
-               cEval False ([],[])
-                     (Lam $ Lam $ Lam $ Inf $
-                      PolyElim (Inf (Bound 2))
-                               (Inf (Bound 1))
-                               (Inf (Bound 0))
-                      )),
-             (Global "Sigma", VLam (\a -> VLam (\b -> VSigma a b))),
-             (Global "MkSigma", VLam (\a -> VLam
-                                     (\b -> VLam
-                                     (\v1 -> VLam
-                                     (\v2 -> VComma a b v1 v2))))),
-             (Global "sigElim", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $ Lam $
+     (Global "sigElim", UserDef
+         (VPi VStar                               (\ty -> VPi
+               (VPi ty (const VStar))             (\fy -> VPi
+               (VPi (VSigma ty fy) (const VStar)) (\m -> VPi
+               (VPi ty            (\x ->
+                VPi (fy `vapp` x) (\y ->
+                  m `vapp` VComma ty fy x y)))    (\i -> VPi
+               (VSigma ty fy)                     (\s ->
+               m `vapp` s))))))
+         (cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $ Lam $
                  Inf (SigElim (Inf (Bound 4))
                               (Inf (Bound 3))
                               (Inf (Bound 2))
                               (Inf (Bound 1))
                               (Inf (Bound 0)))
-                 )),
-
-             (Global "Bool", VNamedTy "Bool"),
-             (Global "True", VNamedCon "True" 1),
-             (Global "False", VNamedCon "False" 0),
-             (Global "if", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $
+                 ))),
+    ---------------------------------------------------
+    -- List things
+    ---------------------------------------------------
+    (Global "Nil", UserDef
+        (VPi VStar (\ a -> VVec a VZero))
+        (VLam VNil)),
+    (Global "Cons", UserDef
+        (VPi VStar (\ a ->
+         VPi VNat (\ n ->
+         VPi a (\_ -> VPi (VVec a n) (\_ -> VVec a (VSucc n))))))
+        (VLam (\ a -> VLam (\ n -> VLam (\ x -> VLam (\ xs ->
+                             VCons a n x xs)))))),
+    (Global "Vec", UserDef
+        (VPi VStar (\_ -> VPi VNat (\_ -> VStar)))
+        (VLam (\a -> VLam (\n -> VVec a n)))),
+    (Global "vecElim", UserDef
+        (VPi VStar (\ a ->
+         VPi (VPi VNat (\ n -> VPi (VVec a n) (\_ -> VStar))) (\ m ->
+         VPi (m `vapp` VZero `vapp` (VNil a)) (\_ ->
+         VPi (VPi VNat (\ n ->
+              VPi a (\ x ->
+              VPi (VVec a n) (\ xs ->
+              VPi (m `vapp` n `vapp` xs) (\_ ->
+              m `vapp` VSucc n `vapp` VCons a n x xs))))) (\_ ->
+         VPi VNat (\ n ->
+         VPi (VVec a n) (\ xs -> m `vapp` n `vapp` xs)))))))
+        (cEval False ([],[]) $ Lam $ Lam $ Lam $ Lam $ Lam $ Lam
+            (Inf (VecElim (Inf (Bound 5))
+                          (Inf (Bound 4))
+                          (Inf (Bound 3))
+                          (Inf (Bound 2))
+                          (Inf (Bound 1))
+                          (Inf (Bound 0)))))),
+             ------------------------------------------------------
+             -- Equality
+             ------------------------------------------------------
+             -- (Global "Refl", VPi VStar (\ a -> VPi a (\ x ->
+             --                VEq a x x))),
+             -- (Global "Eq", VPi VStar (\ a -> VPi a (\ x -> VPi a (\y -> VStar)))),
+             -- (Global "eqElim", VPi VStar (\ a ->
+             --                  VPi (VPi a (\ x -> VPi a (\ y -> VPi (VEq a x y) (\_ -> VStar)))) (\m ->
+             --                  VPi (VPi a (\ x -> ((m `vapp` x) `vapp` x) `vapp` VRefl a x))     (\_ ->
+             --                  VPi a (\ x -> VPi a (\ y ->
+             --                  VPi (VEq a x y) (\ eq ->
+             --                  ((m `vapp` x) `vapp` y) `vapp` eq))))))),
+    ------------------------------------------------------
+    -- Bool things
+    ------------------------------------------------------
+    (Global "Bool", UserDef VStar (VNamedTy "Bool")),
+    (Global "True", UserDef (VNamedTy "Bool") (VNamedCon "True" 1)),
+    (Global "False", UserDef (VNamedTy "Bool") (VNamedCon "False" 0)),
+    (Global "if", UserDef
+        (VPi (VPi (VNamedTy "Bool") (const VStar)) (\m -> VPi
+                       (m `vapp` (VNamedCon "True" 1)) (\th -> VPi
+                       (m `vapp` (VNamedCon "False" 0)) (\el -> VPi
+                       (VNamedTy "Bool") (\b ->
+                       m `vapp` b)))))
+        (cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $
                  Inf (Match (Inf (Bound 3))
                             (Inf (Bound 0))
                             [ ("True", Inf (Bound 2))
                             , ("False", Inf (Bound 1))])
-                 )),
-             (Global "Nil", VLam (\ a -> VNil a)),
-             (Global "Cons", VLam (\ a -> VLam (\ n -> VLam (\ x -> VLam (\ xs ->
-                             VCons a n x xs))))),
-             (Global "Vec", VLam (\ a -> VLam (\ n -> VVec a n))),
-             (Global "vecElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))))),
-             (Global "Refl", VLam (\ a -> VLam (\ x -> VRefl a x))),
-             (Global "Eq", VLam (\ a -> VLam (\ x -> VLam (\ y -> VEq a x y)))),
-             (Global "eqElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Lam (Inf (EqElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))))),
-             (Global "FZero", VLam (\ n -> VFZero n)),
-             (Global "FSucc", VLam (\ n -> VLam (\ f -> VFSucc n f))),
-             (Global "Fin", VLam (\ n -> VFin n)),
-             (Global "finElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) )]
+                 ))),
+     ------------------------------------------------------
+     -- Refl things
+     ------------------------------------------------------
+     (Global "Refl", UserDef
+         (VPi VStar (\a -> VPi a (\x -> VEq a x x)))
+         (VLam (\ a -> VLam (\ x -> VRefl a x)))),
+     (Global "Eq", UserDef
+         (VPi VStar (\ a -> VPi a (\ x -> VPi a (\y -> VStar))))
+         (VLam (\a -> VLam (\ x -> VLam (\ y -> VEq a x y))))),
+     (Global "eqElim", UserDef
+         (VPi VStar (\ a ->
+          VPi (VPi a (\ x -> VPi a (\ y -> VPi (VEq a x y) (\_ -> VStar)))) (\m ->
+          VPi (VPi a (\ x -> ((m `vapp` x) `vapp` x) `vapp` VRefl a x))     (\_ ->
+          VPi a (\ x -> VPi a (\ y ->
+          VPi (VEq a x y) (\ eq ->
+          ((m `vapp` x) `vapp` y) `vapp` eq)))))))
+         (cEval False ([],[]) $ Lam $ Lam $ Lam $ Lam $ Lam $ Lam $
+           Inf (EqElim (Inf (Bound 5))
+                       (Inf (Bound 4))
+                       (Inf (Bound 3))
+                       (Inf (Bound 2))
+                       (Inf (Bound 1))
+                       (Inf (Bound 0))))),
+     ------------------------------------------------------
+     -- Finite things
+     ------------------------------------------------------
+     (Global "FZero", UserDef
+         (VPi VNat (\n -> VFin (VSucc n)))
+         (VLam (\n -> VFZero n))),
+     (Global "FSucc", UserDef
+         (VPi VNat (\n -> VPi (VFin n) (\f ->
+             VFin (VSucc n))))
+         (VLam (\n -> VLam (\f -> VFSucc n f)))),
+     (Global "Fin", UserDef
+         (VPi VNat (\_ -> VStar))
+         (VLam VFin)),
+     (Global "finElim", UserDef
+         (VPi (VPi VNat (\n -> VPi (VFin n) (\_ -> VStar))) (\ m ->
+          VPi (VPi VNat (\n -> m `vapp` (VSucc n) `vapp` (VFZero n))) (\_ ->
+          VPi (VPi VNat                  (\n ->
+               VPi (VFin n)              (\f ->
+               VPi (m `vapp` n `vapp` f) (\_ ->
+               m `vapp` VSucc n `vapp` VFSucc n f)))) (\_ ->
+          VPi VNat (\n -> VPi (VFin n) (\f ->
+          m `vapp` n `vapp` f))))))
+         (cEval False ([],[]) $ Lam $ Lam $ Lam $ Lam $ Lam $
+             Inf $ FinElim (Inf (Bound 4))
+                           (Inf (Bound 3))
+                           (Inf (Bound 2))
+                           (Inf (Bound 1))
+                           (Inf (Bound 0))))]
 
+-- lpve :: Ctx Value
+--              (Global "Sigma", VLam (\a -> VLam (\b -> VSigma a b))),
+--              (Global "MkSigma", VLam (\a -> VLam
+--                                      (\b -> VLam
+--                                      (\v1 -> VLam
+--                                      (\v2 -> VComma a b v1 v2))))),
+--              (Global "sigElim", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $ Lam $
+--                  Inf (SigElim (Inf (Bound 4))
+--                               (Inf (Bound 3))
+--                               (Inf (Bound 2))
+--                               (Inf (Bound 1))
+--                               (Inf (Bound 0)))
+--                  )),
+--
+--              (Global "Bool", VNamedTy "Bool"),
+--              (Global "True", VNamedCon "True" 1),
+--              (Global "False", VNamedCon "False" 0),
+--              (Global "if", cEval False ([],[]) (Lam $ Lam $ Lam $ Lam $
+--                  Inf (Match (Inf (Bound 3))
+--                             (Inf (Bound 0))
+--                             [ ("True", Inf (Bound 2))
+--                             , ("False", Inf (Bound 1))])
+--                  )),
+--              (Global "Nil", VLam (\ a -> VNil a)),
+--              (Global "Cons", VLam (\ a -> VLam (\ n -> VLam (\ x -> VLam (\ xs ->
+--                              VCons a n x xs))))),
+--              (Global "Vec", VLam (\ a -> VLam (\ n -> VVec a n))),
+--              (Global "vecElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Lam (Inf (VecElim (Inf (Bound 5)) (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))))),
+--              (Global "FZero", VLam (\ n -> VFZero n)),
+--              (Global "FSucc", VLam (\ n -> VLam (\ f -> VFSucc n f))),
+--              (Global "Fin", VLam (\ n -> VFin n)),
+--              (Global "finElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) )]
+--
 -- Adding nominal type alias
+-- - Synthesize eliminator by reusing the eliminator for the rhs
 lpaddAlias :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
            => Text -> MLTT' 'Inferrable -> m ()
 lpaddAlias name body = do
-  lpassume name (Inf Star)
+  let eliminatorName = toLower name <> "elim"
+
+  pure ()
+
 
 -- Adding enumerations
 lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
           => Text -> [Text] -> m ()
 lpaddData name constructors = do
-  lpassume name (Inf Star)
-  modify @"poly" (\(LangState out ve te) ->
-      LangState out (coerce (Global name, VNamedTy name) : ve) te)
+  modify @"poly" (\(LangState out ctx) -> LangState out
+      (Map.insert (Global name) (UserDef (coerce VStar) (coerce $ VNamedTy name)) ctx))
+  logStr (render (text name <> text " :: " <> cPrint 0 0 (quote0 (coerce VStar))))
   mapM_ (lpAddConstructor name) (zip constructors [0 .. ])
   pure ()
 
 lpAddConstructor :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
   => Text -> (Text, Int) -> m ()
-lpAddConstructor typeName (constructorName, tag) = do
-  modify @"poly" (\(LangState out ve te) -> LangState out
-    ((Global constructorName, coerce (VNamedCon constructorName tag)) : ve)
-    ((Global constructorName, coerce (VNamedTy typeName)) : te))
+lpAddConstructor typeName (constructorName, tag) =
+  modify @"poly" (\(LangState out ctx) -> LangState out $
+    Map.insert
+        (Global constructorName)
+        (UserDef (coerce $ VNamedTy typeName) (coerce $ VNamedCon constructorName tag)) ctx)
 
--- Add something to the type context
+-- Add an assumption to the global context
 lpassume
   :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
   => Text -> CTerm -> m ()
 lpassume x t = do
   check @MLTT' (coerce $ Ann t (Inf Star))
         (\ (y, v) -> logStr (render (text x <> text " :: " <> cPrint 0 0 (quote0 (coerce v)))))
-        (\ (y, v) (LangState out ve te) -> (LangState out ve ((Global x, v) : te)))
+        (\ (y, v) (LangState out ctx) ->
+                  (LangState out (Map.insert (Global x) (Assumption v) ctx)))
 
-printNameContext :: NameEnv Value -> Text
+printNameContext :: [(Name, Value)] -> Text
 printNameContext = unlines . fmap (\(Global nm, ty) -> nm <> ": " <> tshow (cPrint 0 0 (quote0 ty)))
 
-printTypeContext :: Ctx Value -> Text
-printTypeContext = unlines . fmap (\(Global nm, vl) -> nm <> ":= " <> tshow (cPrint 0 0 (quote0 vl)))
 
 type family MLTT (x :: LangTerm) :: *
 type instance MLTT Inferrable = ITerm
@@ -256,9 +334,10 @@ newtype MLTT' (x :: LangTerm) = MLTT' (MLTT x)
 instance Interpreter MLTT' where
   iname = "lambda-Pi"
   iprompt = "LP> "
-  iitype = \ i -> do (LangState _ v c) <- ask @"poly"; pure (coerce (iType False 0 (coerce v, coerce c) (coerce i)))
+  iitype = \ i -> do (LangState _ c) <- ask @"poly";
+                     pure $ coerce $ iType0 False (coerce (values c, types c)) (coerce i)
   iquote = coerce . quote0 . coerce
-  ieval = \ x -> do ctx <- ask @"values"; pure (coerce (iEval False (coerce ctx, []) (coerce x)))
+  ieval = \ctx x -> coerce (iEval False (coerce ctx, []) (coerce x))
   ihastype = id
   icprint = cPrint 0 0 . coerce
   itprint = cPrint 0 0 . quote0 . coerce
@@ -267,8 +346,9 @@ instance Interpreter MLTT' where
   iassume (x, t) = lpassume x (coerce t)
   iaddData = lpaddData
   iaddAlias = lpaddAlias
-  ipolyCtx = do LangState _ ve _ <- get @"poly"
-                pure ([(name, coerce (VMkPoly pos dir)) | (Global name, VMkPoly pos dir) <- coerce ve])
+  ipolyCtx = do LangState _ ctx <- get @"poly"
+                pure ([(name, coerce (VMkPoly pos dir))
+                      | (Global name, VMkPoly pos dir) <- coerce (values ctx)])
 
 getPolyCtx :: HasState "poly" PolyState m => m [Graphical]
 getPolyCtx = do polys <- ipolyCtx
@@ -280,30 +360,19 @@ checkSimple :: (HasState "poly" PolyEngine m)
             -> ((Value, Value) -> PolyEngine)
             -> m ()
 checkSimple term updateState = do
-  (LangState out oldValueContext oldTypeContext) <- get @"poly"
+  (LangState out oldCtx) <- get @"poly"
   --  typecheck and evaluate
-  let x = iType False 0 (coerce oldValueContext, coerce oldTypeContext) term
+  let x = iType False 0 (values oldCtx, types oldCtx) term
   case x of
     -- error, do not update the state
     Left error -> pure ()
     -- success, update the state, print the new result
     Right y   ->
-        let v = iEval False (coerce oldValueContext, []) term
+        let v = iEval False (values oldCtx, []) term
         in put @"poly" (updateState (y, v))
 
-checkPure :: PolyEngine
-          -> ITerm
-          -> ((Value, Value) -> PolyEngine)
-          -> Either Text PolyEngine
-checkPure state@(LangState out ve te) t k =do
-  -- i: Text, t: Type
-  --  typecheck and evaluate
-  x <- iType False 0 (coerce te, coerce ve) t
-  let v = iEval False (coerce ve, []) t
-  return (k (x, v))
-
 initialContext :: PolyEngine
-initialContext = LangState mempty (coerce lpve) (coerce lpte)
+initialContext = LangState mempty (coerce lpCtx)
 
 data LogAndStateCtx = LogAndStateCtx
   { logCtx :: LogCtx

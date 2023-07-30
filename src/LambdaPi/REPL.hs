@@ -35,6 +35,7 @@ import Data.Text.IO as T
 import Data.Kind (Type)
 import Data.Graph.Conversion
 import Data.Graph.JSON
+import qualified Data.Map as Map
 
 import Text.PrettyPrint.HughesPJ hiding (parens, render, text, (<>), char)
 import qualified Text.PrettyPrint.HughesPJ as PP
@@ -65,25 +66,20 @@ data CompileForm
 
 data InteractiveCommand = Cmd [Text] Text (Text -> Command) Text
 
-type Ctx inf = [(Name, inf)]
 data LangState v inf = LangState
   { out :: Text
-  , valCtx :: NameEnv v -- < Context of values
-  , tyCtx :: Ctx inf    -- < Context of types
-                        -- Unless there are postulates, the two should be
-                        -- the same length. Postulates only add to the
-                        -- value context
+  , ctx :: Ctx v inf
   }
   deriving (Show, Eq, Generic)
 
 -- convert from an operation on HasState "poly" to an operation on
 -- HasReader "values". It extracts the value context from the state.
-stateValuesRead
-    :: (HasState "poly" (LangState vals tys) m)
-    => (forall m'. HasReader "values" (NameEnv vals) m' => m' a) -> m a
-stateValuesRead x
-    = zoom @"values" @(Rename "valCtx" :.: Field "valCtx" "poly") @'[]
-      (magnify @"values" @ReadStatePure @'[] x)
+-- stateValuesRead
+--     :: (HasState "poly" (LangState vals tys) m)
+--     => (forall m'. HasReader "values" [(Name, vals)] m' => m' a) -> m a
+-- stateValuesRead x
+--     = zoom @"values" @(Rename "valCtx" :.: Field "valCtx" "poly") @'[]
+--       (magnify @"values" @ReadStatePure @'[] x)
 
 readContext
     :: forall m f a. (HasState "poly" (LangState (f Val) (f Val)) m)
@@ -102,8 +98,8 @@ class Interpreter (c :: LangTerm -> *) where
   iitype   :: HasReader "poly" (LangState (c Val) (c Val)) m
            => (c Inferrable) -> m (Result (c Val))
   iquote   :: (c Val) -> (c Checkable)
-  ieval    :: HasReader "values" (NameEnv (c Val)) m
-           => c Inferrable -> m (c Val)
+  ieval    :: [(Name, (c Val))]
+           -> c Inferrable -> (c Val)
   ihastype :: c Val -> c Val
   icprint  :: c Checkable -> Doc
   itprint  :: c Val -> Doc
@@ -240,7 +236,6 @@ handleCommand
     => ((Text, f Val) -> Graphical)
     -> Command -> m Feedback
 handleCommand encodeData cmd = do
-    (LangState out ve te) <- get @"poly"
     case cmd of
        Quit   ->  (logStr "!@#$^&*") >> return Abort
        Noop   ->  return Continue
@@ -258,7 +253,9 @@ handleCommand encodeData cmd = do
        PolyCtx -> do ctx <- ipolyCtx
                      logStr (tshow $ encode (fmap encodeData ctx))
                      return Continue
-       Browse ->  do logIn (T.unlines [ s | Global s <- LS.reverse (nub (fmap fst te)) ])
+       Browse ->  do
+                     (LangState out ctx) <- get @"poly"
+                     logIn (T.unlines [s | Global s <- Map.keys ctx])
                      return Continue
        Compile c -> do
             case c of
@@ -300,39 +297,41 @@ iinfer t = do
     Left e -> logErr e >> return Nothing
     Right v -> return (Just v)
 
+-- How to add a declaration to the context
+checkEval :: Logger m
+          => HasState "poly" (LangState (f Val) (f Val)) m
+          => Interpreter f
+          => Text -> f Inferrable -> m ()
+checkEval i t = do
+  (LangState out ctx) <- get @"poly"
+  check t
+    (\ (y, v) -> do
+      let outtext = if i == it
+          then render (icprint (iquote v) PP.<> text " :: " PP.<> itprint y)
+          else render (text i PP.<> text " :: " PP.<> itprint y)
+      logStr outtext)
+    (\ (y, v) (LangState out ctx) -> (LangState ""
+        (Map.insert (Global i) (UserDef (ihastype y) v) ctx))
+        -- ((Global i, v) : ve)
+        -- ((Global i, ihastype y) : te))
+    )
+
 handleStmt :: forall f m. Logger m
            => HasState "poly" (LangState (f Val) (f Val)) m
            => Interpreter f
            => Stmt (f Inferrable) (f Checkable)
            -> m ()
 handleStmt stmt = do
-    (LangState out ve te) <- get @"poly"
+    (LangState out ctx) <- get @"poly"
     case stmt of
         Assume ass -> mapM_ iassume ass
         Let x e    -> checkEval x e
         Eval e     -> checkEval it e
         PutStrLn x -> logStr x >> return ()
-        Out f      -> put @"poly" (LangState f ve te)
+        Out f      -> put @"poly" (LangState f ctx)
         DataDecl nm cs -> iaddData nm cs
         TypeAlias nm cs -> iaddAlias nm cs
   where
-    -- How to add a data declaration to the context
-
-    checkEval :: Text -> f Inferrable ->
-        m ()
-    checkEval i t = do
-      (LangState out ve te) <- get @"poly"
-      check t
-        (\ (y, v) -> do
-          let outtext = if i == it
-              then render (icprint (iquote v) PP.<> text " :: " PP.<> itprint y)
-              else render (text i PP.<> text " :: " PP.<> itprint y)
-          logStr outtext)
-          -- unless (T.null out) (liftIO $ writeFile (unpack out) (process outtext)))
-        (\ (y, v) (LangState out ve te) -> (LangState ""
-            ((Global i, v) : ve)
-            ((Global i, ihastype y) : te))
-        )
 
 newtype ValuesFromCtx (m :: Type -> Type) (a :: Type) = ValuesFromCtx (m a)
   deriving (Functor, Applicative, Monad)
@@ -340,8 +339,8 @@ newtype ValuesFromCtx (m :: Type -> Type) (a :: Type) = ValuesFromCtx (m a)
 
 check :: forall f m. Logger m
       => Interpreter f
-      => HasState "poly" (LangState (f Val) (f Val)) m
       -- the state in which we typecheck
+      => HasState "poly" (LangState (f Val) (f Val)) m
       -- the term to check
       => f Inferrable
       -- a way to print the result
@@ -349,16 +348,16 @@ check :: forall f m. Logger m
       -- a way to update the state
       -> ((f Val, f Val) -> LangState (f Val) (f Val) -> LangState (f Val) (f Val))
       -> m ()
-check t print k = do
+check t print upd = do
   --  typecheck and evaluate
   x <- readContext (iinfer t)
   case x of
     Nothing -> pure ()
     Just ty -> do
-      val <- stateValuesRead (ieval t)
+      ctx <- values . ctx <$> get @"poly"
+      let val = ieval ctx t
       print (ty, val)
-      st <- get @"poly"
-      put @"poly" (k (ty, val) st)
+      modify @"poly" (upd (ty, val))
 
 
 

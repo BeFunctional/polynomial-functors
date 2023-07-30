@@ -37,6 +37,7 @@ library
     , extra
     , generic-lens
     , aeson
+    , containers
 
   extensions: LambdaCase, OverloadedStrings, TupleSections
   ghc-options: -fwarn-incomplete-patterns
@@ -92,3 +93,4 @@ test-suite polynomial-functors-test
     , mtl
     , polynomial-functors
     , capability
+    , containers

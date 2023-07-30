@@ -12,7 +12,7 @@ import LambdaPi.Printer
 checkPatternMatching
      :: (CTerm -> Type -> Result ())
      -> (CTerm -> Value)
-     -> (NameEnv Value, Context)
+     -> ([(Name, Value)], Context)
      -> CTerm -> CTerm -> [(Text, CTerm)] -> Result Value
 checkPatternMatching checkType eval context m s clauses = do
     let patterns = fmap fst clauses
@@ -34,7 +34,7 @@ checkPatternMatching checkType eval context m s clauses = do
       checkType branch (mVal `vapp` constructorForId)) (fmap (first Global) clauses)
     return (mVal `vapp` sVal)
 
-checkPatternExhaustive :: (NameEnv Value, Context) -> [Text] -> Value -> Result ()
+checkPatternExhaustive :: ([(Name, Value)], Context) -> [Text] -> Value -> Result ()
 checkPatternExhaustive ctx patterns scrutineeType = do
     constructors <- findAllConstructors
     case constructors \\ patterns of
@@ -53,7 +53,7 @@ checkPatternExhaustive ctx patterns scrutineeType = do
 
 
 -- Check that all patterns are the same type
-checkAllPatterns :: (NameEnv Value, Context) -> [Text] -> Result Value
+checkAllPatterns :: ([(Name, Value)], Context) -> [Text] -> Result Value
 checkAllPatterns (_, ctx) patterns = do
   types <- collectErrors $ fmap
              -- the patterns are just strings, we need to convert to global

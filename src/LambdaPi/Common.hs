@@ -4,6 +4,7 @@ module LambdaPi.Common where
 import Text.PrettyPrint.HughesPJ (Doc)
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Data.Text
+import qualified Data.Map as Map
 import Data.Bifunctor
 
 data Name
@@ -12,13 +13,30 @@ data Name
    | Quote  Int
   deriving (Show, Eq, Ord)
 
+data ContextRow val inf
+  = Assumption { assumedTy :: val }
+  | UserDef { definedTy :: val
+            , definedCon :: inf
+            }
+  deriving (Show, Eq)
+
+getType :: ContextRow v i -> v
+getType (Assumption a) = a
+getType (UserDef a _) = a
+
 data Ty
    = TFree  Name
    | Fun    Ty Ty
   deriving (Show, Eq)
 
 type Result a = Either Text a
-type NameEnv v = [(Name, v)]
+type Ctx val inf = Map.Map Name (ContextRow val inf)
+
+values :: Ctx val inf -> [(Name, inf)]
+values ctx = [(nm, val) | (nm, UserDef _ val) <- Map.toList ctx]
+
+types :: Ctx val inf -> [(Name, val)]
+types = fmap (fmap getType) . Map.toList
 
 data Stmt i tinf
    = Let Text i           --  let x = t

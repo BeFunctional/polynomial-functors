@@ -15,10 +15,10 @@ import LambdaPi.Check.PatternMatching
 
 import Debug.Utils
 
-iType0 :: Bool -> (NameEnv Value,Context) -> ITerm -> Result Type
+iType0 :: Bool -> ([(Name, Value)], Context) -> ITerm -> Result Type
 iType0 shouldTrace = iType shouldTrace 0
 
-iType :: Bool -> Int -> (NameEnv Value,Context) -> ITerm -> Result Type
+iType :: Bool -> Int -> ([(Name, Value)],Context) -> ITerm -> Result Type
 iType shouldTrace ii g (Ann e tyt)
   = traceIf shouldTrace "iType Ann" $
     do cType shouldTrace  ii g tyt VStar
@@ -169,7 +169,7 @@ iType shouldTrace ii g (Match m s p) =
 
 iType shouldTrace _ _ tm = throwError $ "No type match for " <> render (iPrint 0 0 tm)
 
-cType :: Bool -> Int -> (NameEnv Value,Context) -> CTerm -> Type -> Result ()
+cType :: Bool -> Int -> ([(Name, Value)],Context) -> CTerm -> Type -> Result ()
 
 cType shouldTrace ii g (Inf e) v
   = traceIf shouldTrace ("cType Inf " <> show e) $ do

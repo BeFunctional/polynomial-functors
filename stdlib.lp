@@ -88,4 +88,8 @@ let compose = (\p1 p2 ->
               p2)
             p1) :: Poly -> Poly -> Poly
 
-type Morphism = Sigma Type (\x -> x -> Type)
+type Poly2 = Sigma Type (\x -> x -> Type)
+
+-- let getPos = poly2Elim (\_ -> Type) (\s p -> s) :: Poly -> Type
+
+-- type Morphism (p1 :: Poly2) (p1 :: Poly2) = Sigma (
