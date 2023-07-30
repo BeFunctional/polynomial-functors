@@ -113,6 +113,8 @@ class Interpreter (c :: LangTerm -> *) where
            => (Text, (c Checkable)) -> m ()
   iaddData :: Logger m => HasState "poly" (LangState (c Val) (c Val)) m
            => Text -> [Text] -> m ()
+  iaddAlias :: Logger m => HasState "poly" (LangState (c Val) (c Val)) m
+            => Text -> c Inferrable -> m ()
   -- Returns all the poly in context with their first and second component as well as their name
   ipolyCtx :: HasState "poly" (LangState (c Val) (c Val)) m
            => m [(Text, c Val)]
@@ -312,6 +314,7 @@ handleStmt stmt = do
         PutStrLn x -> logStr x >> return ()
         Out f      -> put @"poly" (LangState f ve te)
         DataDecl nm cs -> iaddData nm cs
+        TypeAlias nm cs -> iaddAlias nm cs
   where
     -- How to add a data declaration to the context
 

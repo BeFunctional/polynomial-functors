@@ -88,3 +88,4 @@ let compose = (\p1 p2 ->
               p2)
             p1) :: Poly -> Poly -> Poly
 
+type Morphism = Sigma Type (\x -> x -> Type)

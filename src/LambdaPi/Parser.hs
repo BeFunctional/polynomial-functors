@@ -25,7 +25,7 @@ haskellP = LanguageDef
          , opStart        = opLetter haskellP
          , opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
          , reservedOpNames= ["|", "{", "}", ";"]
-         , reservedNames  = ["forall", "let", "assume", "putStrLn", "out", "data", "match", "as"]
+         , reservedNames  = ["forall", "let", "assume", "putStrLn", "out", "type", "data", "match", "as"]
          , caseSensitive  = True
          }
 
@@ -62,6 +62,15 @@ stringLiteral' = fmap pack (stringLiteral lambdaPi)
 identifier' :: TextParser () Text
 identifier' = fmap pack (identifier lambdaPi)
 
+parseTypeAlias :: [Text] -> TextParser () (Text, ITerm)
+parseTypeAlias e = do
+    reserved lambdaPi "type"
+    tyName <- identifier'
+    reserved lambdaPi "="
+    body <- parseITerm 0 e
+    return (tyName, body)
+
+
 parseData :: TextParser () (Text, [Text])
 parseData = do
     reserved lambdaPi "data"
@@ -74,6 +83,8 @@ parseData = do
 parseStmt :: [Text] -> TextParser () (Stmt ITerm CTerm)
 parseStmt e =
       fmap (uncurry DataDecl) parseData
+  <|>
+      fmap (uncurry TypeAlias) (parseTypeAlias e)
   <|>
       fmap (uncurry Let) (parseLet e)
   <|> do
@@ -166,6 +177,7 @@ parseITerm 3 e =
           Just n  -> return (Bound n)
           Nothing -> return (Free (Global x))
   <|> parens lambdaPi (parseITerm 0 e)
+parseITerm n _ = error ("calling parseITerm with invalid argument: " ++ show n)
 
 parseCTerm :: Int -> [Text] -> TextParser () CTerm
 parseCTerm 0 e =

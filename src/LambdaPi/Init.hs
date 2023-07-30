@@ -208,6 +208,13 @@ lpve =      [(Global "Zero", VZero),
              (Global "Fin", VLam (\ n -> VFin n)),
              (Global "finElim", cEval False ([],[]) (Lam (Lam (Lam (Lam (Lam (Inf (FinElim (Inf (Bound 4)) (Inf (Bound 3)) (Inf (Bound 2)) (Inf (Bound 1)) (Inf (Bound 0))))))))) )]
 
+-- Adding nominal type alias
+lpaddAlias :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
+           => Text -> MLTT' 'Inferrable -> m ()
+lpaddAlias name body = do
+  lpassume name (Inf Star)
+
+-- Adding enumerations
 lpaddData :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
           => Text -> [Text] -> m ()
 lpaddData name constructors = do
@@ -224,6 +231,7 @@ lpAddConstructor typeName (constructorName, tag) = do
     ((Global constructorName, coerce (VNamedCon constructorName tag)) : ve)
     ((Global constructorName, coerce (VNamedTy typeName)) : te))
 
+-- Add something to the type context
 lpassume
   :: Logger m => HasState "poly" (LangState (MLTT' 'Val) (MLTT' 'Val)) m
   => Text -> CTerm -> m ()
@@ -258,6 +266,7 @@ instance Interpreter MLTT' where
   isparse = fmap coerce (parseStmt [])
   iassume (x, t) = lpassume x (coerce t)
   iaddData = lpaddData
+  iaddAlias = lpaddAlias
   ipolyCtx = do LangState _ ve _ <- get @"poly"
                 pure ([(name, coerce (VMkPoly pos dir)) | (Global name, VMkPoly pos dir) <- coerce ve])
 

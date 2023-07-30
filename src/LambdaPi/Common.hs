@@ -27,6 +27,7 @@ data Stmt i tinf
    | PutStrLn Text        --  lhs2TeX hacking, allow to print "magic" string
    | Out Text             --  more lhs2TeX hacking, allow to print to files
    | DataDecl {name :: Text, constructors :: [Text] }
+   | TypeAlias {name :: Text, body :: i }
   deriving (Show)
 
 parensIf :: Bool -> Doc -> Doc
